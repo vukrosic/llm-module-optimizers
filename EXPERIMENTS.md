@@ -30,3 +30,19 @@ Not read in full: 2607.20548, 2605.26842, 2502.16982, 2603.20527, 2601.23000, 17
 - **Kill:** `S_lr - S_rule < max(2 sigma, 0.005)` at both 5s and 1m. The per-module rule question is then answered "not worth it at this size", and that is a publishable measurement if the test passes its controls, but the design search stops.
 
 **Past local work to cite, not repeat.** `muon/rownorm-parts`: a 260-step gain did not hold at 1200 steps, so length checks are part of every claim. `muon/optimizer-design`: inverse-budget Muon wins at 400 steps and breaks at 1600. `muon/qk-adam`: q,k on the standard optimizer loses nothing, 2.635 vs 2.642.
+
+## 2026-11-03: test the test, predictions before the baseline runs
+
+Environment built: tiers, rules, baselines, bug checks, a port check against the authors' Manifold Muon (exact match in float32; their 16-bit arithmetic differs by up to 0.011 per entry on random inputs), and a poison check showing a search picks the same setting when report scores are noise.
+
+Every baseline gets 3 tuning passes on tune rows. Published rankings I expect at 5s and 5sx4, lower is better on `text.web.loss`:
+
+1. Muon recipe beats the standard baseline everywhere (Muon's own reports).
+2. `sym-rownorm` (RowNorm embedding and head) beats `muon` (2605.18106).
+3. `sym` (hybrid MLP on top) beats `sym-rownorm` (2605.18106).
+4. `hetero` beats `stiefel`, and `stiefel` beats `muon` (2606.13276). I expect this one to fail at 250 steps, because the paper's run is 50k steps and constrained weights need time to pay back.
+5. With QK-norm off, DGram on attention is flagged unstable and Stiefel is not (2606.13276).
+
+Controls that must fail: `blind` must lose to every arm that reads gradients. `frozen-mlp` must lose to `muon`. `--leak` must lower report loss without lowering tune loss. `--double` must show twice the tokens and fail the compute cap.
+
+Each run takes about 6 s on one thread. Jobs use 3 low-priority workers beside the other research.

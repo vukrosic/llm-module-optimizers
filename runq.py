@@ -5,7 +5,7 @@ Workers are spawned, not forked, because torch on macOS crashes in a forked chil
 """
 import concurrent.futures as cf, multiprocessing as mp, os, time
 
-LOAD = float(os.environ.get("LOAD", 9)); PAR = int(os.environ.get("PAR", 4)); WORLDS = {}; EX = None
+LOAD = float(os.environ.get("LOAD", 14)); PAR = int(os.environ.get("PAR", 3)); WORLDS = {}; EX = None
 os.environ["OMP_NUM_THREADS"] = "1"; os.environ["MKL_NUM_THREADS"] = "1"
 
 
