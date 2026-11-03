@@ -16,7 +16,7 @@ def jobs(specs, worlds, a):
     return [env.parser().parse_args(["--spec", arms.show(s), "--tier", a.tier, "--evals", "full", "--tag", "soft", "--world", str(w), "--results", a.results]) for s in specs for w in worlds]
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--tier", default="5s"); p.add_argument("--seconds", type=float, default=500); p.add_argument("--results", default=claims.RESULTS); p.add_argument("--choices", default=claims.CHOICES); p.add_argument("--steps", type=int); p.add_argument("--tag", default="soft"); a = p.parse_args(); a.moe = 0; a.tied = False; a.qknorm = True
+    p = argparse.ArgumentParser(); p.add_argument("--tier", default="5s"); p.add_argument("--seconds", type=float, default=500); p.add_argument("--results", default=claims.RESULTS); p.add_argument("--choices", default=claims.CHOICES); a = p.parse_args(); a.steps = 0; a.tag = "soft"; a.moe = 0; a.tied = False; a.qknorm = True
     book = search.Book(os.path.join(env.HERE, a.results)); budget = time.time() + a.seconds; ch = search.choices(a); pick = lambda k: [arms.parse(r["spec"]) for r in ch if r["kind"] == k and r["tier"] == a.tier]
     base = (pick("lronly") or [arms.parse("muon")])[-1]; lion = (pick("mix") or [search.with_rule(base, "qk", "lion", .0025)])[-1]; t0 = search.try_all([base], a, book, budget)[0][0]; print(f"lr-only tune {t0:.4f}", flush=True)
     print(f"control, p 0 on q,k adds {search.try_all([soft(base, 'qk', 0.0, base['qk']['lr'])], a, book, budget)[0][0] - t0:+.4f}", flush=True); best = {}

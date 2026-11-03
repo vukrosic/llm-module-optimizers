@@ -171,3 +171,37 @@ Predictions, written before any run:
 4. The best single p on all four hidden modules loses to the mix (Lion on q,k) by +.002 to +.008. If it ties, one rule with one p is enough for hidden matrices, and I drop the claim that hidden matrices need two rules.
 5. One rule on every matrix (Muon, Lion, RowNorm or NormSGD) loses to the mix by more than +.025 on fresh worlds. Norm scales stay on Adam in these arms, because the matrix rules can't run on vectors.
 6. On worlds 21 to 23, the mix beats lr-only by +.004 to +.012.
+
+### Round 6 results
+
+Added tune loss against lr-only (tune 4.3974), each at its best of 5 lrs. Negative beats lr-only.
+
+| Module | p 0.1 | p 0.25 | p 0.5 | p 0.75 |
+|---|---|---|---|---|
+| q,k | +.0001 | +.0008 | -.0019 | -.0029 |
+| value, output | +.0081 | +.0131 | +.0253 | +.0305 |
+| gate, up | +.0018 | +.0022 | +.0031 | +.0060 |
+| down | +.0005 | +.0016 | +.0024 | +.0032 |
+
+| Comparison | Worlds | Mean gap | Error | Verdict | Per world |
+|---|---|---|---|---|---|
+| p .75 on q,k vs lr-only | 15-19 | +.0056 | .0011 | holds | +.0067 +.0046 +.0036 +.0047 +.0084 |
+| Lion on q,k vs p .75 on q,k | 15-19 | +.0026 | .0010 | tie | +.0034 +.0042 +.0032 +.0022 +.0001 |
+| Mix vs p .1 on all hidden | 15-19 | +.0114 | .0019 | holds | +.0142 +.0130 +.0098 +.0153 +.0047 |
+| p .1 on all hidden vs lr-only | 15-19 | -.0031 | .0020 | tie | -.0040 -.0042 -.0030 -.0083 +.0039 |
+| Mix vs Muon on every matrix | 15-19 | +.0345 | .0021 | holds | +.0304 +.0352 +.0364 +.0362 +.0342 |
+| Mix vs Lion on every matrix | 15-19 | +.0536 | .0023 | holds | +.0570 +.0593 +.0537 +.0522 +.0459 |
+| Mix vs RowNorm on every matrix | 15-19 | +.0609 | .0025 | holds | +.0619 +.0676 +.0639 +.0579 +.0531 |
+| Mix vs NormSGD on every matrix | 15-19 | +.1061 | .0031 | holds | +.1120 +.1109 +.0946 +.1063 +.1066 |
+| Mix vs lr-only | 21-23 | +.0090 | .0013 | holds | +.0115 +.0083 +.0071 |
+| Mix vs p .1 on all hidden | 21-23 | +.0104 | .0013 | holds | +.0101 +.0099 +.0114 |
+
+Prediction 1 failed: p 0 on q,k added +.0026, over the .002 limit, so exact orthogonalization is worse than Muon's 5 Newton-Schulz steps there. Prediction 2 held in part: p .25 did not beat Muon on tune rows, while the fresh gap (+.0056) and the tie with Lion held. Prediction 3 held. Prediction 4 held in direction but the gap was larger than predicted (+.0114 against at most +.008), so one p is not enough for hidden matrices at this size. Prediction 5 held. Prediction 6 held on worlds no earlier run read.
+
+softmuon uses an exact SVD, so it costs more per step than Muon. Its time per step was not measured one run at a time.
+
+## Round 7: does the q,k rule survive 1,000 steps?
+
+The rule search's gain did not hold at 1,000 steps, and this q,k gain is nearly the same design, so it may fade too. The lr of q,k is retuned at this length, on tune rows of world 0, and every other setting stays at the 1,000-step lr-only design.
+
+Prediction, written before any run: on worlds 15 to 19, the best of Lion and Adam on q,k beats Muon on q,k by +.000 to +.004 at 1,000 steps, which is under the .005 floor. If it clears the floor, the q,k rule is not specific to very short training.
