@@ -17,7 +17,7 @@ Every prediction here is committed before its run, so `git log` shows the order.
 
 Not read in full: 2607.20548, 2605.26842, 2502.16982, 2603.20527, 2601.23000, 1709.07417, 2506.01115.
 
-**The one-sentence difference.** Nobody has searched per-module rule assignments under one protocol with the lr tuned per arm, against a control that tunes per-module lr alone with the same number of evaluations.
+**The one-sentence difference.** We did not find a search of per-module rule assignments under one protocol with the lr tuned per arm, against a control that tunes per-module lr alone.
 
 **Boring explanation.** Per-module rule gains may be only per-module step-size differences: the published rule assignments also move embedding and head lrs by 100x, and a rule that normalizes a gradient sets a step size as a side effect.
 
@@ -71,7 +71,7 @@ At 200 report rows the paired error on `text.web.loss` was 0.006, and the win ru
 
 - 2605.09176 (survey, "Navigating LLM Valley") lists whether optimizer assignment can be learned or adapted as an open question. arXiv 2608.28557 (survey) gives a routing table by parameter class. Both are hand assignment.
 - 1709.07417 searches for one update equation on a ConvNet on CIFAR-10. Abstract only read: it does not say whether rules differ by layer.
-- 2605.04055 (MetaAdamW) and SGG (ACL 2025) modulate lr per group, with no choice of rule, so both belong on the lr side of our question.
+- 2605.04055 and SGG (ACL 2025) modulate lr per group, with no choice of rule, so both belong on the lr side of our question.
 - Celo and Celo2 (2501.12670, 2602.19142) learn per-parameter rules, not rules assigned per module. Not read in full.
 
 Two extended searches found no per-module rule search on transformers with lr tuned per arm. That does not show none exists, so any write-up says "we did not find one", and these full texts still need reading before that sentence is used.
@@ -103,3 +103,8 @@ Result at 5sx4: the rule search moved no rule away from `sym`, the best recipe, 
 ## Round 3: 1m, prediction before tuning
 
 Width 64, 4 layers, hidden matrices hold 51%, 1,000 steps. Tune `--from-tier 5sx4`. Predictions: hidden training is worth over .15. Muon beats the standard baseline by .01 to .03. `sym` or `muon` is the best recipe. The rule search changes at most one rule, and its gap on fresh worlds against the best recipe is under .005, so K1 dies at 1m with probability 70%.
+
+
+## Stopped, November 3, 2026
+
+The 1m tuning was stopped before any result, because the fast experiments had already answered the question at these sizes and 1m was too slow alongside other jobs. So the kill test's second tier, `beat.py`, the hidden read and `speed.py` on designs did not run. RESULTS.md lists what did not run. The prediction for 1m stays unscored.

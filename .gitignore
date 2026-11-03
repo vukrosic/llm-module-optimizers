@@ -1,5 +1,4 @@
 data/
-runs/
 __pycache__/
 *.pt
 .DS_Store
