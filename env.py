@@ -17,11 +17,11 @@ FW = os.environ.get("FWDIR", os.path.join(DATA, "web")); PR = os.path.join(DATA,
 EOT, FACTSHARE, COPIES = 50256, 0.1, (2, 8, 32)
 TIERS = {
     "tiny": dict(width=16, layers=1, heads=2, V=2000, batch=4, L=24, steps=20, val_rows=12, marks=2, bench=4, min_facts=4),  # checks code only, its scores mean nothing
-    "5s": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=250, val_rows=200, marks=5, bench=60),
-    "5sx4": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=1000, val_rows=200, marks=8, bench=60),
-    "5sx16": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=4000, val_rows=200, marks=10, bench=60),
-    "1m": dict(width=64, layers=4, heads=4, V=8000, batch=32, L=48, steps=600, val_rows=300, marks=6, bench=150),
-    "5m": dict(width=96, layers=4, heads=4, V=12000, batch=32, L=64, steps=1500, val_rows=500, marks=8, bench=250),
+    "5s": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=250, val_rows=800, marks=5, bench=60),
+    "5sx4": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=1000, val_rows=800, marks=8, bench=60),
+    "5sx16": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=4000, val_rows=800, marks=10, bench=60),
+    "1m": dict(width=64, layers=4, heads=4, V=8000, batch=32, L=48, steps=600, val_rows=800, marks=6, bench=150),
+    "5m": dict(width=96, layers=4, heads=4, V=12000, batch=32, L=64, steps=1500, val_rows=800, marks=8, bench=250),
     "1h": dict(width=256, layers=6, heads=8, V=20000, batch=32, L=128, steps=10000, val_rows=1000, marks=10, bench=500),
     "5h": dict(width=512, layers=8, heads=8, V=50257, batch=64, L=256, steps=60000, val_rows=4000, marks=12, bench=600),
 }
