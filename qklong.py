@@ -11,7 +11,7 @@ WORLDS = (15, 16, 17, 18, 19); LRS = dict(lion=.0032, adam=.019)
 
 def main():
     p = argparse.ArgumentParser(); p.add_argument("--tier", default="5sx4"); p.add_argument("--seconds", type=float, default=500); p.add_argument("--results", default=claims.RESULTS); p.add_argument("--choices", default=claims.CHOICES); a = p.parse_args(); a.steps = 0; a.tag = "qklong"; a.moe = 0; a.tied = False; a.qknorm = True
-    book = search.Book(os.path.join(env.HERE, a.results)); budget = time.time() + a.seconds; ch = search.choices(a); pick = [arms.parse(r["spec"]) for r in ch if r["kind"] == "lronly" and r["tier"] == a.tier]; base = pick[-1] if pick else search.best_recipe(a)[1]
+    book = search.Book(os.path.join(env.HERE, a.results)); budget = time.time() + a.seconds; t = search.tuned(a); base = arms.parse(t["muon"]["spec"] if "muon" in t else "muon")
     t0 = search.try_all([base], a, book, budget)[0][0]; print(f"base tune {t0:.4f}, q,k {base['qk']}", flush=True); best = {}
     for r, lr in LRS.items():
         v, s = min(search.try_all([search.with_rule(base, "qk", r, x) for x in search.grid(lr, 5, 2.5)], a, book, budget), key=lambda t: t[0]); best[r] = s; print(f"{r} on q,k adds {v - t0:+.4f} at lr {s['qk']['lr']:g}", flush=True)

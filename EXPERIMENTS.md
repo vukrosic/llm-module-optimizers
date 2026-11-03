@@ -202,6 +202,6 @@ softmuon uses an exact SVD, so it costs more per step than Muon. Its time per st
 
 ## Round 7: does the q,k rule survive 1,000 steps?
 
-The rule search's gain did not hold at 1,000 steps, and this q,k gain is nearly the same design, so it may fade too. The lr of q,k is retuned at this length, on tune rows of world 0, and every other setting stays at the 1,000-step lr-only design.
+The rule search's gain did not hold at 1,000 steps, and this q,k gain is nearly the same design, so it may fade too. The lr of q,k is retuned at this length, on tune rows of world 0, and every other setting stays at the Muon recipe tuned for 1,000 steps, because no lr-only design exists at this length.
 
 Prediction, written before any run: on worlds 15 to 19, the best of Lion and Adam on q,k beats Muon on q,k by +.000 to +.004 at 1,000 steps, which is under the .005 floor. If it clears the floor, the q,k rule is not specific to very short training.
