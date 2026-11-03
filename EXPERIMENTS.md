@@ -226,3 +226,37 @@ Prediction, written before any run: on worlds 15 to 19 at 1,000 steps, the Muon 
 Muon recipe vs Muon on every matrix, 1,000 steps, worlds 15 to 19: +.0074, error .0017, holds; per world +.0092 +.0110 +.0036 +.0033 +.0101. Tune gap .0054.
 
 The prediction failed low: +.0074 is under the predicted +.010, while it still clears the .005 floor. Adam on embedding and head keeps a smaller gain at 1,000 steps. At 250 steps the same gap is +.0239, error .0020, on the same worlds, read directly from saved rows after this round.
+
+## Round 9: a new rule for query and key, in its own attention environment
+
+The environment is `attnenv.py`. Only the query and key rule changes. It has six tasks with random tokens: copy, select (find one cue among distractors), latest (ignore an earlier binding), majority, retain (forgetting during training) and switch (unlearning a habit). Scores are the area under the test loss curve plus the end loss, with one training run per setting.
+
+How the tasks got here, so nobody reads them as chosen for a rule. No new rule had run when these changes were made; only Muon, frozen and random-direction query and key had.
+- A token-class version of select was solved by frozen query and key, so it could not judge attention, and I replaced it.
+- A key-value lookup stayed at chance with both trained and frozen query and key at 1,200 steps, so I removed it.
+- The first forgetting task lost everything under every rule. A shorter second phase gives partial forgetting.
+- The other modules' lrs mattered far more than I assumed: Muon at .005 on the MLP, value and output matrices learned tasks that .02 did not, so the first task designs were too easy once that was fixed. Scores now include the area under the loss curve, because end losses reach zero.
+
+The new rule comes from one fact. Query-key normalization divides each query and key vector by its size, so scaling all rows of one head leaves that head's output unchanged. Its gradient therefore has no part along those rows, and any fixed-size step makes the rows grow. Under Muon the query and key matrices grew from a size of 8 to about 27 in 600 steps, so the same lr turns them by much less at the end of training than at the start.
+
+Rules:
+- `muon`, `muonsplit` (published as Per-Head Muon, Muon Split and MuonSplit), `adam`, `lion`, `normsgd` and `adamtangent` (AdamP's idea, 2006.08217) are baselines.
+- `muontangent` is per-head Muon with the part along each head's rows removed.
+- `muonsphere` is `muontangent` that also puts each head's rows back at their first size, so the turning angle per step stays constant. My three searches found no source applying this to query-key normalization or to Muon. That does not prove nobody did.
+
+Predictions, all gaps positive for the first rule, floor .02, worlds 4 to 8:
+1. `muonsphere` beats Muon on switch.new.area by at least .05, because its rows don't grow and it can still turn late in training.
+2. `muonsphere` loses to Muon on retain.old.nll, because the same property lets it forget faster. If it wins both, this story is wrong.
+3. `muonsphere` beats Muon on copy.area, select.area and latest.area by at least .02. Lower confidence, about even odds.
+4. `muontangent` ties `muonsplit` on every score, because removing the part along the rows is small at these lrs.
+5. `muonsplit` beats Muon on area scores by at least .02, matching the early boost reported in 2605.08933.
+6. All rules tie on majority.area.
+7. At 4x the steps the area gaps shrink by at least half, as the query and key gain did in rounds 5 and 6.
+
+Drop the idea if `muonsphere` passes no main score against both baselines. The win rule is in `attnbeat.py`.
+
+### Round 9 controls, before any new rule ran
+
+Muon against frozen query and key, worlds 1 to 3, positive means Muon is better: select.area +.636 (error .061), latest.area +.771 (.135), retain.learn.area +1.075 (.175), retain.old.nll +.650 (.312), switch.new.area +1.219 (.507), copy.area +.404 (.275, tie, because world 3 alone gives +.955), majority.area +.033 (.015). A random direction on query and key gives the same picture. Two identical runs on select changed nothing. So select, latest, retain and switch can judge query and key, copy can with care, and majority can't.
+
+Other modules' lrs are Adam .01 on embedding, head and norms, and Muon .005 on value, output and MLP matrices. Muon .0025 scored better on tune rows for retain and switch and worse on latest, but it brings retain.old.nll to .021, where nothing can be measured, so I kept .005. Every arm shares this choice.

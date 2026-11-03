@@ -57,6 +57,16 @@ with stage("each rule takes its published step"):
     p1 = step("polar", alpha=1.0); assert abs(float(p1.norm() / p0.norm()) - float(S.sum())) < 1e-2, "polar with alpha 1 should scale by the nuclear norm"
     s0 = torch.linalg.svdvals(step("softmuon", p=0.0)); assert (s0 - s0[0]).abs().max() < 1e-3 and abs(float(s0.norm()) - 32 ** .5) < 1e-3, f"softmuon p 0 should have equal singular values of Frobenius size sqrt(m), got {s0}"
     assert (step("softmuon", p=1.0) - step("normsgd")).abs().max() < 1e-3, "softmuon p 1 should equal normsgd"
+    hw = torch.randn(8, 8); hg = torch.randn(8, 8); per = lambda x: [x[i:i + 4] for i in (0, 4)]
+    def head_step(rule):
+        w = hw.clone(); rules.RULES[rule](w, hg, {}, .01, dict(h=2)); return w
+    for b, e in zip(per((hw - head_step("muonsplit")) / .01), per(hg * 1.95)): assert (b - rules.newton_schulz(e)).abs().max() < 1e-3, "muonsplit should run Muon on each head alone"
+    for rule in ("muontangent", "adamtangent"):
+        for b, d in zip(per(hw), per((hw - head_step(rule)) / .01)): assert abs(float((b * d).sum())) < 1e-3, f"{rule} should have no part along a head's rows"
+    w = hw.clone(); st = {}; first = [float(b.norm()) for b in per(hw)]
+    for _ in range(50): rules.RULES["muonsphere"](w, torch.randn(8, 8), st, .05, dict(h=2))
+    for b, r in zip(per(w), first): assert abs(float(b.norm()) - r) < 1e-4, "muonsphere should hold each head's size"
+    assert (w - hw).abs().max() > .01, "muonsphere should move the rows"
     wr = torch.randn(32, 8); gr = torch.randn(32, 8); z = step("routernorm", shape_w=wr, grad=gr); assert z.mean(0).abs().max() < 1 and float((z.sum(1)).abs().max()) < 1e3
     assert (step("lion").abs() - 1).abs().max() < 1e-3, "lion should be a sign"
     w1 = torch.randn(12); assert float(step("norm1d", shape_w=w1, grad=torch.randn(12)).norm()) > 0

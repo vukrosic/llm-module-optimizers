@@ -65,6 +65,39 @@ def muon(w, g, st, lr, k):
     beta = k.get("beta", .95); w.add_(newton_schulz(nesterov(st, w, g, beta)) * max(1.0, w.shape[0] / w.shape[1]) ** 0.5, alpha=-lr)
 
 
+def muonsplit(w, g, st, lr, k):
+    """Muon with each attention head's rows orthogonalized on their own: Per-Head Muon in Kimi K3, Muon Split in GLM-5, MuonSplit in 2605.08933. h is the head count. Rows hold a head's output, so the step has Muon's Frobenius size."""
+    d = nesterov(st, w, g, k.get("beta", .95)); n = w.shape[0] // int(k.get("h", 4))
+    for i in range(0, w.shape[0], n): w[i:i + n].add_(newton_schulz(d[i:i + n]), alpha=-lr)
+
+
+def heads(w, k):
+    n = w.shape[0] // int(k.get("h", 4)); return [w[i:i + n] for i in range(0, w.shape[0], n)]
+
+
+def tangent(z, b):
+    """z with its part along b removed, so a step along z changes b's direction and, to first order, not its size."""
+    return z - (z * b).sum() / ((b * b).sum() + 1e-12) * b
+
+
+def muontangent(w, g, st, lr, k):
+    """Per-head Muon with the part along each head's rows removed. Query-key normalization makes a head's output ignore the size of its rows, so that part only grows the rows. The step keeps Muon's Frobenius size."""
+    d = nesterov(st, w, g, k.get("beta", .95))
+    for b, e in zip(heads(w, k), heads(d, k)): z = tangent(newton_schulz(e), b); b.add_(z / (z.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr)
+
+
+def muonsphere(w, g, st, lr, k):
+    """muontangent that then puts each head's rows back at their first size. The rows' size never grows, so one lr turns every head by the same angle at every step of training."""
+    d = nesterov(st, w, g, k.get("beta", .95)); st.setdefault("r", [float(b.norm()) for b in heads(w, k)])
+    for b, e, r in zip(heads(w, k), heads(d, k), st["r"]): z = tangent(newton_schulz(e), b); b.add_(z / (z.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr); b.mul_(r / (b.norm() + 1e-12))
+
+
+def adamtangent(w, g, st, lr, k):
+    """Adam with the part along each head's rows removed, which is AdamP's idea (2006.08217) applied to each head of the query and key matrices."""
+    a, b = k.get("b1", .9), k.get("b2", .999); st.setdefault("t", 0); st["t"] += 1; st.setdefault("m", torch.zeros_like(w)).mul_(a).add_(g, alpha=1 - a); st.setdefault("v", torch.zeros_like(w)).mul_(b).addcmul_(g, g, value=1 - b); z = (st["m"] / (1 - a ** st["t"])) / ((st["v"] / (1 - b ** st["t"])).sqrt() + 1e-8)
+    for x, e in zip(heads(w, k), heads(z, k)): x.add_(tangent(e, x), alpha=-lr)
+
+
 def rownorm(w, g, st, lr, k):
     M = side(heavy(st, w, g, k.get("beta", .95)), k); Z = M / (M.norm(dim=1, keepdim=True) + 1e-8); w.add_(Z.T if k.get("t") else Z, alpha=-lr)
 
@@ -151,9 +184,9 @@ def blind(w, g, st, lr, k):
     d = torch.randn_like(w); w.add_(d / (d.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
 
 
-RULES = dict(adam=adam, muon=muon, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
+RULES = dict(adam=adam, muon=muon, muonsplit=muonsplit, muontangent=muontangent, muonsphere=muonsphere, adamtangent=adamtangent, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
              mm_stiefel=mm_stiefel, mm_dgram=mm_dgram, freeze=freeze, blind=blind)
-ONLY_2D = {"muon", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
+ONLY_2D = {"muon", "muonsplit", "muontangent", "muonsphere", "adamtangent", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
 ONLY_1D = {"norm1d"}
 MANIFOLD = {"mm_stiefel": "stiefel", "mm_dgram": "dgram"}
 
