@@ -11,8 +11,8 @@ import arms, beat, claims, env, runq
 
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--tier", default="5s"); p.add_argument("--run", action="store_true"); p.add_argument("--seconds", type=int, default=280); p.add_argument("--manifold", action="store_true"); p.add_argument("--kind", default="rule"); a = p.parse_args()
-    ch = beat.load(); d, b = beat.design_of(a.tier, ch, a.kind, a.manifold), beat.base_of(a.tier, ch)
+    p = argparse.ArgumentParser(); p.add_argument("--tier", default="5s"); p.add_argument("--run", action="store_true"); p.add_argument("--seconds", type=int, default=280); p.add_argument("--manifold", action="store_true"); p.add_argument("--kind", default="rule"); p.add_argument("--against", default=""); a = p.parse_args()
+    ch = beat.load(); d, b = beat.design_of(a.tier, ch, a.kind, a.manifold), (beat.design_of(a.tier, ch, a.against) if a.against else beat.base_of(a.tier, ch))
     if not d or not b: raise SystemExit("search first")
     if a.run:
         js = [env.parser().parse_args(["--spec", s, "--tier", a.tier, "--evals", "full", "--tag", "k1", "--world", str(w), "--results", claims.RESULTS]) for s in (d["spec"], b["spec"]) for w in beat.WORLDS]
@@ -20,7 +20,7 @@ def main():
         if runq.EX: runq.EX.shutdown()
         print(f"{len(js)} settings, {left} left")
     g = claims.gaps(claims.rows(), d["spec"], b["spec"], a.tier, "text.web.loss", beat.WORLDS); v, m, se = claims.verdict(g)
-    sp = arms.parse(d["spec"]); print(f"tier {a.tier}: control {b['arm']}, {b['evals']} settings, tune {b['tune']}; {a.kind}, {d['evals']} settings, tune {d['tune']}"); print("design:", d["spec"]); print("rules on hidden modules:", {m: sp[m]["rule"] for m in beat.HIDDEN})
+    sp = arms.parse(d["spec"]); print(f"tier {a.tier}: control {b.get('arm', a.against)}, {b['evals']} settings, tune {b['tune']}; {a.kind}, {d['evals']} settings, tune {d['tune']}"); print("design:", d["spec"]); print("rules on hidden modules:", {m: sp[m]["rule"] for m in beat.HIDDEN})
     print(f"gap on report rows, positive means the search wins: mean {m:+.4f}, error {se:.4f}, per world {' '.join(f'{x:+.4f}' for _, x, _ in g)}: {v}")
 
 

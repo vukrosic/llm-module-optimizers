@@ -81,3 +81,9 @@ Two extended searches found no per-module rule search on transformers with lr tu
 Prediction 1 holds: hidden training is worth .103 (21x the floor). Prediction 2 fails at 5s: Muon beats the standard baseline by +.0162, error .0015, same sign in all 5 worlds; I predicted a tie. Prediction 4 holds: hybrid against Muon MLP -.0008, a tie. RowNorm on embedding and head loses to Adam there by -.0239 at 250 steps. All-Stiefel loses to unconstrained by -.0338 at 250 steps, which reverses the paper's 50k-step result on GPT-2 small, so length or size may explain it. Stiefel attention + DGram MLP against All-Stiefel: tie. Jitter sd .0004, world spread about .003. Leak: report -.128, tune -.027. Double: 384,000 tokens, 2 gradients per step.
 
 Commit before the 5s rule search. K1 prediction stays as written above.
+
+## K1 at 5s, and round 1: is the gain only more lr tuning?
+
+Rule search, 218 settings: Lion on attention q and k (lr .0031), everything else Muon or Adam at refined lrs. Against Muon at 62 settings on fresh worlds 10 to 14: mean +.0073, error .0031, per world +.0180 +.0072 +.0067 +.0056 -.0010. It clears K1's bar at 5s and fails `beat.py`'s sign rule, and its lrs differ from the control on every module, so the result can't separate rule from lr.
+
+Prediction before running, for Muon with about 200 extra lr-only settings (`lronly`) on the same worlds: lr-only gains +.002 to +.005 over Muon, and the rule search beats lr-only by +.002 to +.006. So Lion on q and k alone is worth under .005 at this tier, and I'd drop the Lion idea if the gap to lr-only is under .002. Probability the rule search beats lr-only by over .005 and 2 errors: 25%.

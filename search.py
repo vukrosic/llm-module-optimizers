@@ -2,6 +2,7 @@
 
 python3 search.py tune muon sym --tier 5s [--from-tier 5s]    tune each recipe's lr per module
 python3 search.py rule --tier 5s                              K1: per-module rule and lr, from the best tuned recipe
+python3 search.py lronly --tier 5s                            K1 stricter control: same settings as the rule search, on lrs only
 python3 search.py random --tier 5s --evals-total N            K1 check: random rule and lr per module with N settings
 
 Every arm gets the same protocol and the same lr groups, one lr per module: passes over the modules with 5 lrs 2.5x apart, then 3 lrs 1.6x apart, then 3 lrs 1.25x apart.
@@ -122,6 +123,12 @@ def rule_search(a, book, budget):
     save(dict(kind="rule", start=name, manifold=a.manifold, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe), a)
 
 
+def lr_only(a, book, budget):
+    """The stricter control for K1: the best recipe with about as many extra settings as the rule search, all spent on lrs, no rule changes."""
+    name, spec = best_recipe(a); count = set(); best, spec = tune_lrs(spec, a, book, budget, count, ((7, 1.6), (7, 1.25), (7, 1.12), (7, 1.06)))
+    save(dict(kind="lronly", start=name, manifold=False, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe), a)
+
+
 def random_search(a, book, budget, total):
     r = random.Random(0); m = mods(a); _, base = best_recipe(a); specs = [base]
     for _ in range(total - 1):
@@ -134,7 +141,7 @@ def random_search(a, book, budget, total):
 
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("mode", choices=["tune", "rule", "random"]); p.add_argument("names", nargs="*"); p.add_argument("--tier", default="5s"); p.add_argument("--from-tier", default=""); p.add_argument("--steps", type=int, default=0); p.add_argument("--manifold", action="store_true")
+    p = argparse.ArgumentParser(); p.add_argument("mode", choices=["tune", "rule", "lronly", "random"]); p.add_argument("names", nargs="*"); p.add_argument("--tier", default="5s"); p.add_argument("--from-tier", default=""); p.add_argument("--steps", type=int, default=0); p.add_argument("--manifold", action="store_true")
     p.add_argument("--moe", type=int, default=0); p.add_argument("--tied", action="store_true"); p.add_argument("--no-qknorm", dest="qknorm", action="store_false"); p.add_argument("--seconds", type=float, default=240); p.add_argument("--evals-total", type=int, default=0)
     p.add_argument("--results", default=RESULTS); p.add_argument("--choices", default="choices.jsonl"); p.add_argument("--tag", default="search"); a = p.parse_args()
     book = Book(os.path.join(env.HERE, a.results)); budget = time.time() + a.seconds
@@ -147,6 +154,8 @@ def main():
             save(dict(kind="tune", arm=n, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe, tied=a.tied, qknorm=a.qknorm), a)
     elif a.mode == "rule":
         if ("rule", None, a.tier, a.moe, False, True, a.manifold) not in done: rule_search(a, book, budget)
+    elif a.mode == "lronly":
+        if ("lronly", None, a.tier, a.moe, False, True, False) not in done: lr_only(a, book, budget)
     elif ("random", None, a.tier, a.moe, False, True, False) not in done: random_search(a, book, budget, a.evals_total or 150)
     if runq.EX: runq.EX.shutdown()
 
