@@ -97,7 +97,7 @@ Partly. Choosing rules per module by hand is published. We did not find a rule s
 pip install -r requirements.txt
 python3 setup_data.py
 python3 claims.py --tier 5s
-python3 env.py --spec muon --tier 5s
+python3 env.py --spec muon --tier 5s --world 7
 ```
 
 `claims.py` reads the saved results and needs neither the data nor training. The last line trains one setting in about 10 seconds on one CPU core; `setup_data.py` downloads 392 MB.

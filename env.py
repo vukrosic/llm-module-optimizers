@@ -61,7 +61,9 @@ class World:
     def __init__(s, c, steps, world=0):
         s.c = c; s.world = world; s.enc = tiktoken.get_encoding("gpt2"); rng = np.random.default_rng(world)
         shard = np.memmap(os.path.join(FW, "fineweb_train_000001.bin"), dtype=np.uint16, mode="r", offset=1024)
-        counts = np.load(os.path.join(DATA, "counts.npy")); s.counts = counts
+        cp = os.path.join(DATA, "counts.npy")
+        if not os.path.exists(cp): os.makedirs(DATA, exist_ok=True); np.save(cp, np.bincount(np.asarray(shard[:20_000_000]), minlength=65536))
+        counts = np.load(cp); s.counts = counts
         s.keep = np.unique(np.concatenate([np.argsort(counts)[-(c["V"] - 2):], [EOT]])); s.V = len(s.keep) + 1; s.unk = s.V - 1
         s.look = np.full(65536, s.unk, np.int64); s.look[s.keep] = np.arange(len(s.keep)); kept = set(s.keep.tolist())
         s.E = lambda t: s.enc.encode(" " + t.strip())
