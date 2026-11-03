@@ -50,3 +50,19 @@ Each run takes about 6 s on one thread. Jobs use 3 low-priority workers beside t
 ## 2026-11-03: the first table was too noisy, so every row count went up
 
 At 200 report rows the paired error on `text.web.loss` was 0.006, and the win rule needs z above 2 on a gap of 0.005, so the test could not pass or fail a design at its own floor. Tune rows had the same error, so a search could pick a setting on row noise. Now 800 rows per split at 5s, 5sx4, 5sx16, 1m and 5m. Muon against the standard baseline, same settings: gap 0.0229 at 200 rows, 0.0118 at 800 rows, error 0.0028, so the first gap was almost twice too large. Scoring tune rows costs about 1.2 s per run. No design had run. The 200-row table is kept in `old/` and is not comparable.
+
+## Old test results, kept in `old/`, not comparable (November 3, 2026)
+
+800 rows at 5s with 4,000 tokens, tune/report: muon 5.5305/5.5461; standard 5.5340/5.5443; normsgd-all 5.5457/5.5608; sym-hybrid-all 5.5488/5.5672; frozen-mlp 5.5544/5.5709; sym 5.5546/5.5730; stiefel 5.5576/5.5734; sym-rownorm 5.5599/5.5799; rownorm-all 5.5772/5.5941; lion-all 5.5832/5.5939; blind 8.1106/8.1271. Muon against standard: -.0018, -.0032, -.0126 across worlds 0, 1, 2. At 1,000 steps: sym-rownorm 5.1793, muon 5.1949, standard 5.2012, so RowNorm on embedding and head reversed with length.
+
+## Review 1 and test version 3
+
+`reviews/review-1.md` holds the 17 findings and what was done. Test version 3: 3,200 rows per split, hidden matrices hold 37% at 5s, 51% at 1m, 54% at 15m, one lr per module for every arm, fresh worlds 10 to 14 for verdicts, world 20 for the hidden read. Fact scores don't exist at 5s and have 16 facts at 1m, so these tiers judge language and context scores only, and that limit gets stated in the write-up. Facts appear from 15m (304).
+
+## Predictions for test version 3, written before any tuning
+
+1. Hidden training (Muon against `frozen-hidden`) is worth .10 to .40 at 5s and more at 1m, so both tiers count. Dropped tier if under .05.
+2. Muon against the standard baseline is a tie at 5s (under .01), and Muon leads by .005 to .03 at 5sx4 and 1m.
+3. RowNorm on embedding and head beats Adam there at 5sx4 by .005 to .02, as it did on the old test.
+4. Hybrid against Muon MLP is a tie with equal lr groups, gap under .005 at every tier.
+5. K1: the rule search wins on tune rows by .005 to .02 and keeps at most half of that on fresh worlds. Probability of clearing K1 at both 5s and 1m is about 25%. If it dies, the negative result (per-module rules add nothing beyond per-module lrs under one protocol) is the paper's main claim.

@@ -13,7 +13,7 @@ torch.set_num_threads(1)
 
 class stage:
     def __init__(s, name): s.name = name
-    def __enter__(s): s.t = time.time(); signal.alarm(7); print(s.name, end=" ... ", flush=True)
+    def __enter__(s): s.t = time.time(); signal.signal(signal.SIGALRM, lambda *_: sys.exit(f"{s.name} ran over 7 s")); signal.alarm(7); print(s.name, end=" ... ", flush=True)
     def __exit__(s, kind, *rest):
         signal.alarm(0)
         if not kind: print(f"ok {time.time() - s.t:.1f}s", flush=True)
@@ -32,6 +32,7 @@ with stage("world rows"):
     v, t, h = ({r.tobytes() for r in x} for x in (W.val, W.tune, W.hid)); assert not (v & t or v & h or t & h), "report, tune and hidden rows overlap"
     W1 = env.World(C, C["steps"], 1); assert not (W.rows == W1.rows[:len(W.rows)]).all() and not (W.val == W1.val).all(), "world 1 equals world 0"
     assert not ({r.tobytes() for r in W1.val} & (v | t | h)), "world 1 reads world 0's held-out rows"
+    assert env.STRIDE >= C["steps"] * C["batch"] * C["L"], "worlds overlap in training text"
 
 with stage("model: no future, every weight learns"):
     for kw in (dict(), dict(moe=3), dict(tied=True), dict(qknorm=False)):
@@ -72,7 +73,7 @@ with stage("wrong shapes are refused"):
 
 with stage("repeat: same setting, same scores; jitter differs"):
     a = env.train(args(results=out), arms.parse("muon"), W, out); b = env.train(args(results=out), arms.parse("muon"), W, out); assert a["scores"] == b["scores"] and a["curve"] == b["curve"], "not repeatable"
-    j = env.train(args(results=out, jitter=1), arms.parse("muon"), W, out); assert j["scores"]["text.web.loss"] != a["scores"]["text.web.loss"], "jitter changed nothing"
+    j = env.train(args(results=out, jitter=1), arms.parse("muon"), W, out); assert j["scores"]["text.tune.loss"] != a["scores"]["text.tune.loss"], "jitter changed nothing"; assert set(a["scores"]) == {"text.tune.loss"}, "a search row holds a report score"
     assert env.key_of(args(), arms.parse("muon")) != env.key_of(args(jitter=1), arms.parse("muon")), "jitter shares a key"
 
 with stage("every arm trains on the dense model"):

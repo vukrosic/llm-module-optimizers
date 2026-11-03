@@ -1,83 +1,106 @@
-"""The win rule, written before any new design runs. A per-module assignment wins only if all of this holds against the best tuned published baseline at that tier.
+"""The win rule, written before any new design runs. A per-module assignment wins only if all of this holds against the best tuned recipe at each tier, read from choices.jsonl, never typed.
 
-Fairness: both arms train the same model, the same weights, on the same tokens in the same order, with one gradient per step, and both get tuned with search.py's protocol on tune rows of world 0.
+Fairness: every arm trains the same model and weights on the same tokens in the same order with one gradient per step. Every arm has one lr per module, tuned on tune rows of world 0 by search.py. A design must come from choices.jsonl, so lr splitting alone can't win: the base has the same splits.
 
-1. Fresh worlds. text.web.loss gap on report rows of each confirmation world (100, 101, 102). No search reads these worlds. The gap has the same sign in all 3.
-2. Size of the gap. Mean gap over worlds exceeds max(0.005, 2 sigma), where sigma is the standard deviation of the paired gap across the 3 worlds, and paired z over rows exceeds 2 in each world.
-3. Length and size. The rule holds at every tier in TIERS, each assignment's lrs re-tuned at that tier. At 5sx4 the gap must be at least half of its 5s value, because a 260-step gain in muon/rownorm-parts did not hold at 1200 steps.
-4. Compute. Same tokens and one gradient per step; time per step, measured one run at a time on one thread, at most 1.25x the baseline; optimizer state at most 2x the baseline.
-5. Stability. No instability flag in any world.
-6. Other scores. Among scores that can judge (judges.json), wins at least equal losses over the 3 worlds, and every loss is printed.
-If it comes close, the result stays "no win" and the lost scores go in the report. The number of designs tried is printed from choices.jsonl.
+1. Fresh worlds. Report rows of worlds 10 to 14, which no search reads. The gap has the same sign in all 5.
+2. Size. Mean gap over worlds exceeds max(0.005, t x error), where error is the larger of the spread across worlds over root 5 and the row error, and t is Student's with 4 degrees of freedom at 2.5% divided by the number of designs tried.
+3. Mixed. The design uses at least 2 rules on hidden modules, or it is a recipe with a single rule and not a per-module result.
+4. Length and size. Every tier in TIERS passes with its own tuning. At 5sx4 the gap keeps at least half of its 5s value, because a 260-step gain in muon/rownorm-parts did not hold at 1200 steps. A tier counts only if hidden training is worth at least 10x the floor there.
+5. Compute. Same tokens, one gradient per step, time per step at most 1.25x the base, from the fastest of at least 3 speed.py runs each, and state at most 2x.
+6. Stability. No instability flag in any world.
+7. Other scores. Among scores that judges.json admits, wins at least equal losses over the 5 worlds, and every loss is printed. Without judges.json the rule refuses to run.
+8. Hidden rows. After all designs, the final design and base run once with --final in world 20, and the sign must hold there. final.py does this and refuses a second run.
+If it comes close, the result stays "no win" and the lost scores go in the report.
 
-python3 beat.py --design 5s="<spec>" --design 5sx4="<spec>" --design 1m="<spec>" --base 5s="<spec>" --base 5sx4="<spec>" --base 1m="<spec>" --time 5s=.024,.024 ...
-Each tier names the re-tuned spec of both arms. A tier left out counts as not passed.
+python3 beat.py --design rule [--manifold]
 """
 import argparse, json, os
 import numpy as np
+from scipy import stats
 import arms, claims, env
 
-WORLDS = (100, 101, 102); TIERS = ("5s", "5sx4", "1m"); MIN_GAP = 0.005; COMPUTE = 1.25; STATE = 2.0
-LOWER = (".loss", ".nll", ".delta")
+WORLDS = (10, 11, 12, 13, 14); TIERS = ("5s", "5sx4", "1m"); MIN_GAP = 0.005; COMPUTE = 1.25; STATE = 2.0; ALPHA = 0.05; HIDDEN = ("qk", "vo", "gu", "down"); CONTROLS = ("blind", "frozen-mlp", "frozen-hidden")
+LOWER = (".loss", ".nll", ".delta"); HIGHER = (".acc", ".pick", ".gain", ".margin", ".over-chance")
 
 
 def better(score, d):
-    """d = baseline - design; positive means the design is better on a lower-is-better score."""
-    return d if score.endswith(LOWER) else -d
+    """d = base - design as scores. Positive means the design is better."""
+    if score.endswith(LOWER): return d
+    if score.endswith(HIGHER): return -d
+    raise ValueError(f"{score} has no direction")
 
 
-def row(all_rows, spec, tier, world):
-    want = arms.show(arms.parse(spec))
-    for r in reversed(all_rows):
-        if r["spec"] == want and r["tier"] == tier and r["world"] == world and r["jitter"] == 0 and r["lr_mult"] == 1 and r["evals"] == "full" and r["moe"] == 0 and not r["leak"] and not r["double"]: return r
+def load():
+    return [json.loads(l) for l in open(os.path.join(env.HERE, claims.CHOICES))]
 
 
-def judge(design, base, tier, all_rows, judges, speed=None):
-    gaps, zs, why, wins, losses = [], [], [], {}, {}
+def base_of(tier, ch):
+    t = [r for r in ch if r["kind"] == "tune" and r["tier"] == tier and r.get("moe", 0) == 0 and r.get("qknorm", True) and not r.get("tied") and r["arm"] not in CONTROLS]
+    return min(t, key=lambda r: r["tune"]) if t else None
+
+
+def design_of(tier, ch, kind, manifold=False):
+    t = [r for r in ch if r["kind"] == kind and r["tier"] == tier and r.get("moe", 0) == 0 and r.get("manifold", False) == manifold]
+    return t[-1] if t else None
+
+
+def tried(ch):
+    return max(1, sum(r["kind"] in ("rule", "random", "design") for r in ch))
+
+
+def speed(spec, tier):
+    p = os.path.join(env.HERE, claims.SPEED); want = arms.show(arms.parse(spec))
+    v = [r["s_per_step"] for r in map(json.loads, open(p)) if r["spec"] == want and r["tier"] == tier] if os.path.exists(p) else []
+    return min(v) if len(v) >= 3 else None
+
+
+def judge(d, b, tier, rows, judges, n):
+    gaps, why, wins, losses = [], [], {}, {}
+    if len({arms.parse(d["spec"])[m]["rule"] for m in HIDDEN}) < 2: why.append("one rule on all hidden modules, so this is a recipe, not a per-module result")
     for w in WORLDS:
-        d, b = row(all_rows, design, tier, w), row(all_rows, base, tier, w)
-        if not d or not b: why.append(f"world {w} not run"); continue
-        if not d["finite"] or d["opt"]["unstable"]: why.append(f"unstable in world {w}: {d['opt'].get('why')}")
-        if d["tokens"] != b["tokens"] or d["grads_per_step"] != 1: why.append(f"tokens or gradients differ in world {w}: {d['tokens']} vs {b['tokens']}")
-        if d["state_bytes"] > STATE * b["state_bytes"]: why.append(f"state {d['state_bytes']} is over {STATE}x baseline {b['state_bytes']}")
-        if not d["finite"] or not b["finite"]: continue
-        x = np.load(os.path.join(env.RUNS, b["key"] + ".npz")); y = np.load(os.path.join(env.RUNS, d["key"] + ".npz")); g = x["text.web.loss"] - y["text.web.loss"]
-        gaps.append(float(g.mean())); zs.append(float(g.mean() / (g.std(ddof=1) / len(g) ** .5)))
+        x, y = claims.find(rows, b["spec"], tier, w), claims.find(rows, d["spec"], tier, w)
+        if not x or not y: why.append(f"world {w} not run"); continue
+        if not y["finite"] or y["opt"]["unstable"]: why.append(f"unstable in world {w}: {y['opt'].get('why')}"); continue
+        if y["tokens"] != x["tokens"] or y["grads_per_step"] != 1: why.append(f"tokens or gradients differ in world {w}")
+        if y["state_bytes"] > STATE * x["state_bytes"]: why.append(f"state {y['state_bytes']} is over {STATE}x base {x['state_bytes']}")
+        a, c = np.load(os.path.join(env.RUNS, x["key"] + ".npz")), np.load(os.path.join(env.RUNS, y["key"] + ".npz")); g = a["text.web.loss"] - c["text.web.loss"]; gaps.append((float(g.mean()), float(g.std(ddof=1) / len(g) ** .5)))
         for s in judges:
-            if s not in x or len(x[s]) < 2: continue
-            e = better(s, x[s] - y[s]); z = float(e.mean() / (e.std(ddof=1) / len(e) ** .5 + 1e-12))
+            if s not in a or len(a[s]) < 30: continue
+            e = better(s, a[s] - c[s]); z = float(e.mean() / (e.std(ddof=1) / len(e) ** .5 + 1e-12))
             if z > 2: wins[s] = wins.get(s, 0) + 1
             if z < -2: losses.setdefault(s, []).append(round(float(e.mean()), 4))
-    if len(gaps) < len(WORLDS): why.append("not all worlds finished"); return dict(win=False, why=why, gaps=gaps, zs=zs)
-    if min(gaps) <= 0: why.append(f"gap changes sign across worlds: {[round(g, 4) for g in gaps]}")
-    sigma = float(np.std(gaps, ddof=1)); need = max(MIN_GAP, 2 * sigma)
-    if np.mean(gaps) <= need: why.append(f"mean gap {np.mean(gaps):.4f} is not above {need:.4f}")
-    if min(zs) <= 2: why.append(f"z over rows {[round(z, 1) for z in zs]}")
+    out = dict(design=d["spec"], base=b.get("arm"), base_spec=b["spec"], settings=dict(design=d["evals"], base=b["evals"]), wins=wins, losses=losses)
+    if len(gaps) == len(WORLDS):
+        v = np.array([g[0] for g in gaps]); se = max(v.std(ddof=1) / len(v) ** .5, float(np.mean([g[1] for g in gaps]))); t = float(stats.t.ppf(1 - ALPHA / 2 / n, len(v) - 1)); need = max(MIN_GAP, t * se)
+        out.update(gaps=[round(float(x), 4) for x in v], mean=round(float(v.mean()), 4), error=round(se, 4), need=round(need, 4))
+        if v.min() <= 0: why.append("gap changes sign across worlds")
+        if v.mean() <= need: why.append(f"mean gap {v.mean():.4f} is not above {need:.4f}")
     if sum(wins.values()) < sum(len(v) for v in losses.values()): why.append(f"loses more judged scores than it wins: {losses}")
-    if speed:
-        if speed[0] > COMPUTE * speed[1]: why.append(f"time per step {speed[0]:.4f} is over {COMPUTE}x baseline {speed[1]:.4f}")
-    else: why.append("time per step not measured one run at a time")
-    return dict(win=not why, why=why, gaps=[round(g, 4) for g in gaps], zs=[round(z, 1) for z in zs], need=round(need, 4), wins=wins, losses=losses)
+    a, c = speed(b["spec"], tier), speed(d["spec"], tier)
+    if a is None or c is None: why.append("time per step not measured 3 times by speed.py")
+    elif c > COMPUTE * a: why.append(f"time per step {c:.4f} is over {COMPUTE}x base {a:.4f}")
+    frozen = next((r for r in load() if r["kind"] == "tune" and r["tier"] == tier and r.get("arm") == "frozen-hidden"), None); x = claims.find(rows, b["spec"], tier); f = claims.find(rows, frozen["spec"], tier) if frozen else None
+    if not f or not x: why.append("frozen-hidden control not run")
+    elif f["scores"]["text.web.loss"] - x["scores"]["text.web.loss"] < 10 * MIN_GAP: why.append(f"hidden training is worth only {f['scores']['text.web.loss'] - x['scores']['text.web.loss']:.3f} at this tier")
+    out.update(win=not why, why=why); return out
 
 
-def named(items):
-    return dict(x.split("=", 1) for x in items)
-
-
-def verdict(design, base, all_rows, judges, speed):
-    """Rule 3 sits here: every tier must pass by itself, and the 5sx4 gap must keep at least half of the 5s gap."""
-    out = {t: judge(design[t], base[t], t, all_rows, judges, speed.get(t)) if t in design and t in base else dict(win=False, why=["tier not run"], gaps=[]) for t in TIERS}
-    a, b = out["5s"]["gaps"], out["5sx4"]["gaps"]
-    if a and b and np.mean(b) < .5 * np.mean(a): out["5sx4"]["win"] = False; out["5sx4"]["why"].append(f"gap faded with length: {np.mean(a):.4f} at 5s, {np.mean(b):.4f} at 5sx4")
+def verdict(kind, manifold, rows, ch, judges):
+    n = tried(ch); out = {}
+    for t in TIERS:
+        d, b = design_of(t, ch, kind, manifold), base_of(t, ch); out[t] = judge(d, b, t, rows, judges, n) if d and b else dict(win=False, why=["tier not run"])
+    a, b = out[TIERS[0]].get("mean"), out[TIERS[1]].get("mean")
+    if a and b and b < .5 * a: out[TIERS[1]]["win"] = False; out[TIERS[1]]["why"].append(f"gap faded with length: {a:.4f} at {TIERS[0]}, {b:.4f} at {TIERS[1]}")
     return out, all(v["win"] for v in out.values())
 
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--design", action="append", required=True); p.add_argument("--base", action="append", required=True); p.add_argument("--time", action="append", default=[]); a = p.parse_args()
-    all_rows = claims.rows(); path = os.path.join(env.HERE, "judges.json"); judges = json.load(open(path)) if os.path.exists(path) else []
-    speed = {t: tuple(float(x) for x in v.split(",")) for t, v in named(a.time).items()}
-    out, win = verdict(named(a.design), named(a.base), all_rows, judges, speed); print(json.dumps(out, indent=1)); print("WIN" if win else "NO WIN")
-    rows = [json.loads(l) for l in open(os.path.join(env.HERE, "choices.jsonl"))]; print("designs tried so far:", sum(r.get("kind") in ("rule", "random", "design") for r in rows), "searches,", sum(r.get("evals", 0) for r in rows), "settings in all")
+    global TIERS
+    p = argparse.ArgumentParser(); p.add_argument("--design", default="rule"); p.add_argument("--manifold", action="store_true"); p.add_argument("--tiers", default=",".join(TIERS)); a = p.parse_args(); TIERS = tuple(a.tiers.split(","))
+    path = os.path.join(env.HERE, claims.JUDGES)
+    if not os.path.exists(path): raise SystemExit("run audit.py first: the rule needs judges.json")
+    ch = load(); out, win = verdict(a.design, a.manifold, claims.rows(), ch, json.load(open(path))); print(json.dumps(out, indent=1)); print("WIN" if win else "NO WIN")
+    print("designs tried:", tried(ch), "; settings in all:", sum(r.get("evals", 0) for r in ch))
 
 
 if __name__ == "__main__":

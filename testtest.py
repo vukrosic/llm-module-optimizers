@@ -12,9 +12,9 @@ def job(spec, tier, results, *extra):
 
 def jobs(ch, a):
     out = []; want = a.part.split(","); use = [n for n in ch]; mu = ch["muon"]["spec"]
-    if "noise" in want: out += [job(mu, a.tier, a.results, "--jitter", str(k)) for k in range(0, 9)]
+    if "noise" in want: out += [job(mu, a.tier, a.results, "--jitter", str(k)) for k in range(0, 5)]
     if "full" in want: out += [job(ch[n]["spec"], a.tier, a.results) for n in use]
-    if "world" in want: out += [job(ch[n]["spec"], a.tier, a.results, "--world", str(w)) for n in use for w in (1, 2)]
+    if "world" in want: out += [job(ch[n]["spec"], a.tier, a.results, "--world", str(w)) for n in use for w in (1, 2, 3, 4)]
     if "lr" in want: out += [job(ch[n]["spec"], a.tier, a.results, "--lr-mult", "1.5") for n in use if n != "blind"]
     if "cheat" in want: out += [job(mu, a.tier, a.results, "--leak"), job(mu, a.tier, a.results, "--double")]
     if "qk" in want: out += [job(ch[n]["spec"], a.tier, a.results, "--no-qknorm") for n in ("stiefel", "hetero", "dgram", "muon") if n in ch]

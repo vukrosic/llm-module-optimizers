@@ -6,7 +6,7 @@ One knob, --tier, sets the model size and steps, so every arm reads the same tok
 memory, with the head untied by default because the module-optimizer papers treat embedding and head separately. A spec gives every
 module a rule and an lr (arms.py). Text is fresh web text read once plus FACTSHARE of ParaRel sentences. --world N changes the text, facts,
 held-out rows and starting weights, and search runs never read a world above 0. Rows go to results.jsonl with a key per setting,
-so a finished setting is never rerun; per-item scores go to runs/. text.tune.loss is the only score a search may read.
+so a finished setting is never rerun; per-item scores go to runs/. A search row stores text.tune.loss and no report score, so nothing picking a setting can read one.
 """
 import argparse, collections, fcntl, glob, hashlib, json, os, signal, subprocess, time
 import numpy as np, tiktoken, torch, torch.nn as nn, torch.nn.functional as F
@@ -14,16 +14,16 @@ import arms, evals, rules
 
 HERE = os.path.dirname(os.path.abspath(__file__)); DATA = os.path.join(HERE, "data"); RUNS = os.path.join(HERE, "runs")
 FW = os.environ.get("FWDIR", os.path.join(DATA, "web")); PR = os.path.join(DATA, "pararel")
-EOT, FACTSHARE, COPIES = 50256, 0.1, (2, 8, 32)
+EOT, FACTSHARE, COPIES, STRIDE, TEST_VERSION = 50256, 0.1, (2, 8, 32), 4_000_000, 3  # worlds start STRIDE tokens apart, so their training text never overlaps; TEST_VERSION is in each row's key, so rows from an older test are never reused
 TIERS = {
     "tiny": dict(width=16, layers=1, heads=2, V=2000, batch=4, L=24, steps=20, val_rows=12, marks=2, bench=4, min_facts=4),  # checks code only, its scores mean nothing
-    "5s": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=250, val_rows=800, marks=5, bench=60),
-    "5sx4": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=1000, val_rows=800, marks=8, bench=60),
-    "5sx16": dict(width=48, layers=2, heads=4, V=4000, batch=16, L=48, steps=4000, val_rows=800, marks=10, bench=60),
-    "1m": dict(width=64, layers=4, heads=4, V=8000, batch=32, L=48, steps=600, val_rows=800, marks=6, bench=150),
-    "5m": dict(width=96, layers=4, heads=4, V=12000, batch=32, L=64, steps=1500, val_rows=800, marks=8, bench=250),
-    "1h": dict(width=256, layers=6, heads=8, V=20000, batch=32, L=128, steps=10000, val_rows=1000, marks=10, bench=500),
-    "5h": dict(width=512, layers=8, heads=8, V=50257, batch=64, L=256, steps=60000, val_rows=4000, marks=12, bench=600),
+    "5s": dict(width=48, layers=2, heads=4, V=1000, batch=16, L=48, steps=250, val_rows=3200, marks=5, bench=60),
+    "5sx4": dict(width=48, layers=2, heads=4, V=1000, batch=16, L=48, steps=1000, val_rows=3200, marks=8, bench=60),
+    "5sx16": dict(width=48, layers=2, heads=4, V=1000, batch=16, L=48, steps=4000, val_rows=3200, marks=10, bench=60),
+    "1m": dict(width=64, layers=4, heads=4, V=1500, batch=16, L=48, steps=1000, val_rows=3200, marks=6, bench=150),
+    "15m": dict(width=128, layers=6, heads=8, V=4000, batch=16, L=64, steps=2000, val_rows=3200, marks=8, bench=250),
+    "1h": dict(width=256, layers=6, heads=8, V=8000, batch=32, L=128, steps=10000, val_rows=3200, marks=10, bench=500),
+    "5h": dict(width=512, layers=8, heads=8, V=20000, batch=64, L=256, steps=60000, val_rows=4000, marks=12, bench=600),
 }
 STOP = set("""a an the of in on at to for from by with as is was are were be been being has had have do does did
 and or but not no it its this that these those which who whom whose what where when there their his her he she they
@@ -69,7 +69,7 @@ class World:
         s.facts = s.pick_facts(rng, kept, int(tokens * FACTSHARE))
         doc = lambda f: np.array([EOT] + s.E(f["S"][rng.integers(len(f["S"]))].replace("[X]", f["s"]).replace("[Y]", f["o"])), np.int64)
         early = [doc(f) for f in s.facts if f["early"] for _ in range(f["copies"])]; docs = [doc(f) for f in s.facts if not f["early"] for _ in range(f["copies"])]
-        nfact = sum(map(len, docs + early)); nweb = tokens + 2 * c["L"] - nfact; start = world * nweb
+        nfact = sum(map(len, docs + early)); nweb = tokens + 2 * c["L"] - nfact; start = world * max(STRIDE, nweb)
         if start + nweb > len(shard): raise SystemExit(f"world {world} needs {start + nweb} web tokens, the shard has {len(shard)}")
         web = np.asarray(shard[start:start + nweb]).astype(np.int64); cut = np.flatnonzero(web == EOT)
         wdocs = np.split(web, cut[1:]) if len(cut) > 1 else [web]
@@ -78,8 +78,10 @@ class World:
         def rows_of(part):
             st = np.concatenate([part[i] for i in rng.permutation(len(part))]); r = st[:len(st) // c["L"] * c["L"]].reshape(-1, c["L"]); return r[rng.permutation(len(r))]
         part1 = rows_of(early + [d for d, g in zip(alld, go) if g]); s.rows = np.concatenate([part1, rows_of([d for d, g in zip(alld, go) if not g])]); s.split = len(part1)
-        val = np.memmap(os.path.join(FW, "fineweb_val_000000.bin"), dtype=np.uint16, mode="r", offset=1024)  # rows spread across the file: reported, tuning and hidden rows alternating
-        held = np.stack([np.asarray(val[a:a + c["L"]]) for a in np.linspace(world * 3 * c["L"], len(val) - c["L"] - 1, 3 * c["val_rows"]).astype(np.int64)]).astype(np.int64)
+        val = np.memmap(os.path.join(FW, "fineweb_val_000000.bin"), dtype=np.uint16, mode="r", offset=1024)  # reported, tuning and hidden rows alternate
+        slots = np.random.default_rng(777).permutation(len(val) // c["L"])[world * 3 * c["val_rows"]:(world + 1) * 3 * c["val_rows"]] * c["L"]  # same shuffle in every world, so worlds and splits share no token
+        if len(slots) < 3 * c["val_rows"]: raise SystemExit(f"world {world} needs more held-out text")
+        held = np.stack([np.asarray(val[a:a + c["L"]]) for a in slots]).astype(np.int64)
         s.val, s.tune, s.hid = held[::3], held[1::3], held[2::3]
         s.nfact, s.nweb = nfact, nweb
 
@@ -158,7 +160,7 @@ class LM(nn.Module):
 
 def key_of(a, spec):
     """One setting, one row: what changes the result, and nothing else."""
-    d = dict(spec=arms.show(spec), tier=a.tier, steps=a.steps, world=a.world, jitter=a.jitter, lr_mult=a.lr_mult, qknorm=a.qknorm, tied=a.tied, moe=a.moe, leak=a.leak, double=a.double, evals=a.evals)
+    d = dict(version=TEST_VERSION, config=TIERS[a.tier], spec=arms.show(spec), tier=a.tier, steps=a.steps, world=a.world, jitter=a.jitter, lr_mult=a.lr_mult, qknorm=a.qknorm, tied=a.tied, moe=a.moe, leak=a.leak, double=a.double, evals=a.evals)
     return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]
 
 

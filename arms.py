@@ -6,7 +6,9 @@ Baselines, with lrs only as starting points because search.py tunes every arm on
 - muon: Muon on hidden matrices, Adam on embedding, head and norm scales (Muon's own recipe).
 - sym, sym-hybrid-all: 2605.18106, RowNorm or hybrid on embedding and head, Muon on attention, hybrid on SwiGLU; routers get routernorm.
 - stiefel, hetero, hetero-inv, dgram: 2606.13276, Stiefel or DGram on attention and MLP, Adam on the rest.
-- rownorm-all, lion-all, normsgd-all: one rule on every matrix. RMNP (2603.20527) is rownorm-all with the same momentum form.
+- rownorm-all, lion-all, normsgd-all: one rule on every matrix.
+- frozen-mlp, frozen-hidden, blind: controls. frozen-hidden never trains a hidden matrix, so it shows how much of the score hidden training can move at a tier.
+No arm uses weight decay and momentum is fixed by each rule, because these tiers are too short for decay to matter. A spec can set both.
 Not ported: NorMuon, RS-MR, SOAP, because each needs extra state and tuning we have not matched to its authors' code.
 """
 import json, re
@@ -64,7 +66,8 @@ ARMS = {
     "lion-all": lambda: base(emb="lion", head="lion", att="lion", mlp="lion", router="lion"),
     "normsgd-all": lambda: base(emb="normsgd", head="normsgd", att="normsgd", mlp="normsgd", router="normsgd"),
     "frozen-mlp": lambda: base(mlp="freeze", router="adam"),
-    "blind": lambda: base(emb="blind", head="blind", att="blind", mlp="blind", router="blind"),
+    "frozen-hidden": lambda: base(att="freeze", mlp="freeze", router="adam"),
+    "blind": lambda: dict(base(emb="blind", head="blind", att="blind", mlp="blind", router="blind"), norm=dict(rule="blind", lr=LRS["blind"])),
 }
 
 

@@ -293,5 +293,6 @@ FULL = [text, rarity, ambiguous, facts, changed, unknown, conflict, context, tra
 
 def run_all(ctx, level="full"):
     out = {}
-    for g in FULL if level == "full" else [text]: out.update(g(ctx))
+    if level != "full": return {"text.tune.loss": ctx.row_loss(ctx.W.tune)}  # a search row holds no report score
+    for g in FULL: out.update(g(ctx))
     return out

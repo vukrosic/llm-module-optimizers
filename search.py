@@ -1,19 +1,20 @@
-"""Tune and search on tune rows only. This file never reads text.web.loss or any other report score; debug/poison.py checks that by scrambling them.
+"""Tune and search on tune rows only. Search rows hold no report score, so nothing here can read one.
 
-python3 search.py tune muon sym --tier 5s     tune each named baseline's lrs
-python3 search.py rule --tier 5s              K1 per-module rule + lr coordinate search from the tuned Muon recipe
-python3 search.py lr --tier 5s                K1 control: per-module lr only, same start, same number of evaluations
-python3 search.py random --tier 5s            K1 control: random rule + lr per module, same number of evaluations
+python3 search.py tune muon sym --tier 5s [--from-tier 5s]    tune each recipe's lr per module
+python3 search.py rule --tier 5s                              K1: per-module rule and lr, from the best tuned recipe
+python3 search.py random --tier 5s --evals-total N            K1 check: random rule and lr per module with N settings
 
-Every arm gets the same protocol: a coordinate pass over its lr groups with 5 lrs, then two passes with 3 around the current best, so a best lr at a grid's edge moves the grid.
-The number of distinct settings run per arm is printed and saved with the choice.
+Every arm gets the same protocol and the same lr groups, one lr per module: passes over the modules with 5 lrs 2.5x apart, then 3 lrs 1.6x apart, then 3 lrs 1.25x apart.
+A best lr at the edge of the first grid moves that grid, at most 3 times, so a choice ends inside its grid. A coordinate never accepts a value worse than the one it holds.
+The lr control for K1 is the best tuned recipe. It has had more settings than the rule search, because all the recipes were tuned first; both counts are saved.
+The rule search anchors each rule's lrs on what tuning chose for that rule on that module, and it starts from the best recipe's scores. Its menu leaves out manifold rules (about 3x the time per step, over beat.py's cap), and search.py rule --manifold adds them.
 """
 import argparse, json, math, os, random, sys, time
 import arms, env, runq
 
-FACTOR = 2.5; RESULTS = "results.jsonl"
-MATRIX_RULES = ("adam", "muon", "rownorm", "polar", "leftpolar", "hybrid", "lion", "sgdm", "normsgd")
-SPARSE_ROWS = ("emb", "head")
+PASSES = ((5, 2.5), (3, 1.6), (3, 1.25)); RESULTS = "results.jsonl"
+MATRIX_RULES = ("adam", "muon", "rownorm", "polar", "hybrid", "lion", "sgdm", "normsgd")  # leftpolar equals polar on tall matrices and takes V x V eigendecompositions on embedding and head
+NORM_RULES = ("adam", "norm1d", "sgdm", "lion"); MANIFOLD = ("mm_stiefel", "mm_dgram"); HIDDEN = ("qk", "vo", "gu", "down")
 
 
 def spec_args(s, a, **k):
@@ -37,7 +38,7 @@ class Book:
 def round_lr(x): return float(f"{x:.2g}")
 
 
-def grid(c, n): return [round_lr(c * FACTOR ** (i - n // 2)) for i in range(n)]
+def grid(c, n, f): return [round_lr(c * f ** (i - n // 2)) for i in range(n)]
 
 
 def try_all(specs, a, book, budget):
@@ -48,43 +49,30 @@ def try_all(specs, a, book, budget):
     return [(book.tune(j), s) for j, s in zip(js, specs)]
 
 
-def lr_groups(spec, moe):
-    """Published recipes share an lr across hidden matrices with one rule; embedding, head and norm scales keep their own."""
-    use = {m: g for m, g in spec.items() if moe or m not in arms.MOE}; out = {}
-    for m, g in use.items():
-        key = m if m in ("emb", "head", "norm", "router") else g["rule"]
-        out.setdefault(key, []).append(m)
-    return list(out.values())
+def with_lr(cur, m, lr):
+    s = {k: dict(g) for k, g in cur.items()}; s[m]["lr"] = lr; return s
 
 
-def coordinate(spec, moves, a, book, budget, count):
-    """moves yields (name, candidates) for one coordinate at a time. Keeps the best on tune rows. count collects distinct settings run."""
-    best = None
-    for n, cands in moves:
-        cs = cands(spec); res = try_all(cs, a, book, budget); count.update(arms.show(s) for s in cs); v, s = min(res, key=lambda p: p[0])
-        if best is None or v < best: best, spec = v, s
-        print(f"  {n}: tune {v:.4f}  distinct settings {len(count)}", flush=True)
-    return best, spec
+def with_rule(cur, m, r, lr):
+    s = {k: dict(g) for k, g in cur.items()}; s[m] = dict(rule=r, lr=lr); return s
 
 
-def tune_moves(spec, moe, passes=3):
-    for p, n in enumerate((5, 3, 3)[:passes]):
-        for ms in lr_groups(spec, moe):
-            if spec[ms[0]]["rule"] == "freeze": continue
-
-            def cands(cur, ms=ms, n=n):
-                out = []
-                for lr in grid(cur[ms[0]]["lr"], n):
-                    s = {m: dict(g) for m, g in cur.items()}
-                    for m in ms: s[m]["lr"] = lr
-                    out.append(s)
-                return out
-            yield f"pass {p + 1} lr of {'+'.join(ms)}", cands
+def mods(a): return [m for m in arms.MODULES + (arms.MOE if a.moe else ()) if not (m == "head" and a.tied)]
 
 
-def tune(name, a, book, budget):
-    count = set(); spec = arms.parse(name); best, spec = coordinate(spec, tune_moves(spec, a.moe), a, book, budget, count)
-    save(dict(kind="tune", arm=name, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe, tied=a.tied, qknorm=a.qknorm), a)
+def tune_lrs(spec, a, book, budget, count, passes=PASSES):
+    """The protocol every arm gets. Returns the best tune score and spec, and it never moves to a worse setting."""
+    best = try_all([spec], a, book, budget)[0][0]; count.add(arms.show(spec))
+    for n, f in passes:
+        for m in mods(a):
+            if spec[m]["rule"] == "freeze": continue
+            lrs = grid(spec[m]["lr"], n, f); moves = 3 if n == 5 else 0
+            while lrs:
+                res = try_all([with_lr(spec, m, x) for x in lrs], a, book, budget); count.update(arms.show(with_lr(spec, m, x)) for x in lrs); v, s = min(res, key=lambda p: p[0])
+                if v < best: best, spec = v, s
+                now = spec[m]["lr"]; edge = now == max(lrs) and 1 or now == min(lrs) and -1  # a best at the edge moves the grid one lr further
+                lrs = [round_lr(now * f ** edge)] if edge and moves else []; moves -= 1
+            print(f"  {f}x lr of {m}: tune {best:.4f}, settings {len(count)}", flush=True)
     return best, spec
 
 
@@ -93,81 +81,74 @@ def save(d, a):
     print("chosen:", json.dumps(d), flush=True)
 
 
-def rule_moves(modules):
-    for m in modules:
-        rs = ("adam", "norm1d", "sgdm", "lion") if m == "norm" else MATRIX_RULES + (("routernorm",) if m == "router" else ())
-
-        def cands(cur, m=m, rs=rs):
-            out = []
-            for r in rs:
-                for lr in grid(arms.LRS[r], 5):
-                    s = {k: dict(g) for k, g in cur.items()}; s[m] = dict(rule=r, lr=lr); out.append(s)
-            return out
-        yield f"rule+lr of {m}", cands
+def choices(a):
+    p = os.path.join(env.HERE, a.choices); return [json.loads(l) for l in open(p)] if os.path.exists(p) else []
 
 
-def lr_moves(modules, n):
-    for m in modules:
-        def cands(cur, m=m, n=n):
-            out = []
-            for lr in grid(cur[m]["lr"], n):
-                s = {k: dict(g) for k, g in cur.items()}; s[m]["lr"] = lr; out.append(s)
-            return out
-        yield f"lr of {m}", cands
+def tuned(a, tier=None):
+    return {r["arm"]: r for r in choices(a) if r["kind"] == "tune" and r["tier"] == (tier or a.tier) and r["moe"] == a.moe and r.get("tied", False) == a.tied and r.get("qknorm", True) == a.qknorm}
 
 
-def mods(a): return [m for m in ("emb", "head", "qk", "vo", "gu", "down", "norm") + (arms.MOE if a.moe else ()) if not (m == "head" and a.tied)]
+CONTROLS = ("blind", "frozen-mlp", "frozen-hidden")
 
 
-def start_spec(a):
-    rows = [json.loads(l) for l in open(os.path.join(env.HERE, a.choices))]
-    rows = [r for r in rows if r["kind"] == "tune" and r["arm"] == "muon" and r["tier"] == a.tier and r["moe"] == a.moe]
-    if not rows: raise SystemExit("tune the muon arm first")
-    return arms.parse(rows[-1]["spec"])
+def best_recipe(a):
+    t = {k: v for k, v in tuned(a).items() if k not in CONTROLS}
+    if not t: raise SystemExit("tune the recipes first")
+    k = min(t, key=lambda x: t[x]["tune"]); return k, arms.parse(t[k]["spec"])
+
+
+def anchors(a):
+    """rule -> module -> the lr that tuning chose for that rule on that module, the same rule on any module as a fallback through LRS."""
+    out = {}
+    for r in tuned(a).values():
+        for m, g in arms.parse(r["spec"]).items():
+            if r["arm"] not in CONTROLS: out.setdefault(g["rule"], {}).setdefault(m, g["lr"])
+    return out
 
 
 def rule_search(a, book, budget):
-    count = set(); spec = start_spec(a); best, spec = coordinate(spec, list(rule_moves(mods(a))) + list(lr_moves(mods(a), 3)), a, book, budget, count)
-    save(dict(kind="rule", spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe), a)
-
-
-def lr_search(a, book, budget, total):
-    """Same start and same limit on evaluations as the rule search. Passes repeat around the best lr until the limit or until a pass changes nothing."""
-    count = set(); spec = start_spec(a); m = mods(a); n = 7; best = None
-    while len(count) < total:
-        before = arms.show(spec); v, spec = coordinate(spec, list(lr_moves(m, n)), a, book, budget, count); best = v if best is None else min(best, v); n = 3
-        if arms.show(spec) == before: break
-    save(dict(kind="lr", spec=arms.show(spec), tune=best, evals=len(count), limit=total, tier=a.tier, moe=a.moe), a)
+    """Per-module rule and lr, from the best recipe. Anchored rules get 3 lrs 2.5x apart, unanchored rules 5. The current setting stays a candidate, so a move never loses."""
+    name, spec = best_recipe(a); an = anchors(a); count = set(); best = try_all([spec], a, book, budget)[0][0]
+    for m in mods(a):
+        cands = []; menu = NORM_RULES if m == "norm" else MATRIX_RULES + (MANIFOLD if a.manifold and m in HIDDEN else ()) + (("routernorm",) if m == "router" else ())
+        for r in menu:
+            lr = an.get(r, {}).get(m); lrs = grid(lr, 3, 2.5) if lr else grid(arms.LRS[r], 5, 2.5)
+            cands += [with_rule(spec, m, r, x) for x in lrs]
+        res = try_all(cands, a, book, budget); count.update(arms.show(s) for s in cands); v, s = min(res, key=lambda p: p[0])
+        if v < best: best, spec = v, s
+        print(f"  rule of {m}: tune {best:.4f}, now {spec[m]['rule']}:{spec[m]['lr']:g}, settings {len(count)}", flush=True)
+    best, spec = tune_lrs(spec, a, book, budget, count, PASSES[1:])
+    save(dict(kind="rule", start=name, manifold=a.manifold, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe), a)
 
 
 def random_search(a, book, budget, total):
-    r = random.Random(0); m = mods(a); base = start_spec(a); specs = [base]
+    r = random.Random(0); m = mods(a); _, base = best_recipe(a); specs = [base]
     for _ in range(total - 1):
         s = {k: dict(g) for k, g in base.items()}
         for k in m:
-            rs = ("adam", "norm1d", "sgdm", "lion") if k == "norm" else MATRIX_RULES
-            x = r.choice(rs); s[k] = dict(rule=x, lr=round_lr(arms.LRS[x] * FACTOR ** r.uniform(-2, 2)))
+            x = r.choice(NORM_RULES if k == "norm" else MATRIX_RULES); s[k] = dict(rule=x, lr=round_lr(arms.LRS[x] * 2.5 ** r.uniform(-2, 2)))
         specs.append(s)
     res = try_all(specs, a, book, budget); v, s = min(res, key=lambda p: p[0])
     save(dict(kind="random", spec=arms.show(s), tune=v, evals=len(res), tier=a.tier, moe=a.moe), a)
 
 
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("mode", choices=["tune", "rule", "lr", "random"]); p.add_argument("names", nargs="*"); p.add_argument("--tier", default="5s"); p.add_argument("--steps", type=int, default=0)
+    p = argparse.ArgumentParser(); p.add_argument("mode", choices=["tune", "rule", "random"]); p.add_argument("names", nargs="*"); p.add_argument("--tier", default="5s"); p.add_argument("--from-tier", default=""); p.add_argument("--steps", type=int, default=0); p.add_argument("--manifold", action="store_true")
     p.add_argument("--moe", type=int, default=0); p.add_argument("--tied", action="store_true"); p.add_argument("--no-qknorm", dest="qknorm", action="store_false"); p.add_argument("--seconds", type=float, default=240); p.add_argument("--evals-total", type=int, default=0)
     p.add_argument("--results", default=RESULTS); p.add_argument("--choices", default="choices.jsonl"); p.add_argument("--tag", default="search"); a = p.parse_args()
     book = Book(os.path.join(env.HERE, a.results)); budget = time.time() + a.seconds
-    done = set()
-    if os.path.exists(os.path.join(env.HERE, a.choices)):
-        for l in open(os.path.join(env.HERE, a.choices)):
-            r = json.loads(l); done.add((r["kind"], r.get("arm"), r["tier"], r["moe"], r.get("tied", False), r.get("qknorm", True)))
+    done = {(r["kind"], r.get("arm"), r["tier"], r["moe"], r.get("tied", False), r.get("qknorm", True), r.get("manifold", False)) for r in choices(a)}
     if a.mode == "tune":
+        start = tuned(a, a.from_tier) if a.from_tier else {}
         for n in a.names:
-            if ("tune", n, a.tier, a.moe, a.tied, a.qknorm) in done: continue
-            print(n, flush=True); tune(n, a, book, budget)
-    elif a.mode == "rule": rule_search(a, book, budget)
-    elif a.mode == "lr": lr_search(a, book, budget, a.evals_total or 150)
-    else: random_search(a, book, budget, a.evals_total or 150)
+            if ("tune", n, a.tier, a.moe, a.tied, a.qknorm, False) in done: continue
+            print(n, flush=True); count = set(); spec = arms.parse(start[n]["spec"]) if n in start else arms.parse(n); best, spec = tune_lrs(spec, a, book, budget, count)
+            save(dict(kind="tune", arm=n, spec=arms.show(spec), tune=best, evals=len(count), tier=a.tier, moe=a.moe, tied=a.tied, qknorm=a.qknorm), a)
+    elif a.mode == "rule":
+        if ("rule", None, a.tier, a.moe, False, True, a.manifold) not in done: rule_search(a, book, budget)
+    elif ("random", None, a.tier, a.moe, False, True, False) not in done: random_search(a, book, budget, a.evals_total or 150)
+    if runq.EX: runq.EX.shutdown()
 
 
 if __name__ == "__main__":
