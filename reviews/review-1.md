@@ -20,6 +20,6 @@ A fresh reviewer read the code against `brief.md`. It found no leak: searches re
 | 14, 15 | Worlds overlapped, and val shards followed one order. | Worlds start `max(4M, tokens)` apart, and held rows come from a fixed permutation of slots, disjoint per world. |
 | 16 | A best lr could sit at a grid edge. | The first grid moves up to 3 times. |
 | 17 | Some scores mean nothing at this size. | The audit's item minimum and its rules handle them. Fact scores don't exist at 5s (V 1000 holds no fact names) and have too few items at 1m. |
-| minor | `debug/port_check.py` takes coefficients from `rules.py`. | Not fixed yet. |
+| minor | `debug/port_check.py` takes coefficients from `rules.py`. | It now holds the table pasted from the authors' `msign.py`. |
 
 The reviewer also noted that "nobody has searched this" sits beside seven unread papers, including optimizer search 1709.07417, so the claim stays out of any write-up until they are read.

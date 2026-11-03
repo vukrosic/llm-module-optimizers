@@ -7,6 +7,9 @@ signal.alarm(7)
 
 
 HALF = [True]
+THEIR_ABC = [(8.28721201814563, -23.595886519098837, 17.300387312530933), (4.107059111542203, -2.9478499167379106, 0.5448431082926601), (3.9486908534822946, -2.908902115962949, 0.5518191394370137), (3.3184196573706015, -2.488488024314874, 0.51004894012372),
+             (2.300652019954817, -1.6689039845747493, 0.4188073119525673), (1.891301407787398, -1.2679958271945868, 0.37680408948524835), (1.8750014808534479, -1.2500016453999487, 0.3750001645474248), (1.875, -1.25, 0.375)]
+THEIR_STABLE = [(a / 1.01, b / 1.01 ** 3, c / 1.01 ** 5) for a, b, c in THEIR_ABC[:-1]] + [THEIR_ABC[-1]]
 
 
 def their_msign(G, steps=10):
@@ -14,7 +17,7 @@ def their_msign(G, steps=10):
     if tr: x = x.mT
     x /= x.norm(dim=(-2, -1), keepdim=True) * 1.01
     for step in range(steps):
-        a, b, c = rules.STABLE[step] if step < len(rules.STABLE) else rules.STABLE[-1]
+        a, b, c = THEIR_STABLE[step] if step < len(THEIR_STABLE) else THEIR_STABLE[-1]
         s = x @ x.mT; y = c * s; y.diagonal(dim1=-2, dim2=-1).add_(b); y = y @ s; y.diagonal(dim1=-2, dim2=-1).add_(a); x = y @ x
     if tr: x = x.mT
     return torch.nan_to_num(x).float()
