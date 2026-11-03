@@ -205,3 +205,18 @@ softmuon uses an exact SVD, so it costs more per step than Muon. Its time per st
 The rule search's gain did not hold at 1,000 steps, and this q,k gain is nearly the same design, so it may fade too. The lr of q,k is retuned at this length, on tune rows of world 0, and every other setting stays at the Muon recipe tuned for 1,000 steps, because no lr-only design exists at this length.
 
 Prediction, written before any run: on worlds 15 to 19, the best of Lion and Adam on q,k beats Muon on q,k by +.000 to +.004 at 1,000 steps, which is under the .005 floor. If it clears the floor, the q,k rule is not specific to very short training.
+
+### Round 7 results
+
+| Comparison on q,k at 1,000 steps | Worlds | Mean gap | Error | Verdict | Per world |
+|---|---|---|---|---|---|
+| Lion vs Muon | 15-19 | +.0001 | .0018 | tie | -.0038 -.0041 +.0012 +.0025 +.0048 |
+| Adam vs Muon | 15-19 | +.0010 | .0018 | tie | -.0047 -.0007 +.0014 +.0037 +.0053 |
+
+On tune rows, Muon was better: Lion added +.0034 and Adam added +.0031. The prediction held: the q,k gain is specific to very short training in this environment.
+
+## Round 8: does Adam on embedding and head survive 1,000 steps?
+
+The q,k rule faded, so the larger gap has to be checked at the same length. Muon on every matrix is tuned at 1,000 steps with the same protocol as the other recipes.
+
+Prediction, written before any run: on worlds 15 to 19 at 1,000 steps, the Muon recipe (Adam on embedding and head) beats Muon on every matrix by +.010 to +.040. If it is under the .005 floor, one rule is enough for matrices at this length.
