@@ -8,7 +8,7 @@ module a rule and an lr (arms.py). Text is fresh web text read once plus FACTSHA
 held-out rows and starting weights, and search runs never read a world above 0. Rows go to results.jsonl with a key per setting,
 so a finished setting is never rerun; per-item scores go to runs/. text.tune.loss is the only score a search may read.
 """
-import argparse, collections, glob, hashlib, json, os, signal, subprocess, time
+import argparse, collections, fcntl, glob, hashlib, json, os, signal, subprocess, time
 import numpy as np, tiktoken, torch, torch.nn as nn, torch.nn.functional as F
 import arms, evals, rules
 
@@ -214,6 +214,7 @@ def train(a, spec, W=None, out=None):
                weights=dict(weights), finite=bool(finite), curve=curve)
     if finite:
         model.eval(); te = time.time(); s = evals.run_all(ctx, a.evals); res["eval_s"] = round(time.time() - te, 2)
+        if os.environ.get("POISON"): s = {k: (v if k == "text.tune.loss" else np.random.default_rng(int.from_bytes(key.encode()[:4], "big")).random(len(v))) for k, v in s.items()}  # debug/poison.py: a search must not change when report scores are noise
         res["scores"] = {k: round(float(np.mean(v)), 4) if len(v) else None for k, v in s.items()}; res["n"] = {k: len(v) for k, v in s.items()}
         half = len(losses) // 5; res["opt"] = dict(spike=round(max(losses[half:]) - min(losses[:half + 1]), 4) if losses[half:] else None, auc=round(float(np.mean([v for _, v in curve])), 4), rel=opt.rel_sizes(), **unstable_flags(curve))
         res["opt"]["sigma_max"] = {}
@@ -230,7 +231,8 @@ def train(a, spec, W=None, out=None):
             with open(os.path.join(HERE, "final_results.jsonl"), "a") as f: f.write(json.dumps(dict(key=key, spec=res["spec"], tier=a.tier, world=a.world, scores={k: round(float(np.mean(v)), 4) if len(v) else None for k, v in hid.items()})) + "\n")
     else:
         res["scores"] = {}; res["opt"] = dict(unstable=True, why="not finite")
-    with open(out, "a") as f: f.write(json.dumps(res) + "\n")
+    with open(out, "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX); f.write(json.dumps(res) + "\n")
     return res
 
 
