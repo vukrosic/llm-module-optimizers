@@ -122,3 +122,17 @@ Predictions:
 4. The best mix beats the lr-only design on fresh worlds by under .01, and it may tie.
 
 Stop rule: if the best mix does not clear max(.005, 2 errors) against the lr-only design, the result at 5s is that no rule mix beats tuned lrs on Muon's recipe. One design goes to fresh worlds, so nothing is picked among them. Worlds 20 to 23 stay unread.
+
+Result of round 4. The map: the embedding (best 4 rules span .029), head (.017), norm scales (.020) and attention value and output (.034) care about their rule; q,k (.0012), SwiGLU gate (.0043) and output (.0042) barely do. So prediction 2 failed on value and output. Mixes: correlation .881 with the sum of swaps, prediction 3 holds; a mix does .0137 better than the sum on average, and only 1 of 60 beat the base, with median 4.4306 against 4.3974. The base had 155 lr settings and the mixes had their lrs only from the map, which favours the base. Best mix: the lr-only design with Lion on q,k. On fresh worlds 15 to 19 it beats lr-only by +.0083, error .0012 (+.0101 +.0088 +.0068 +.0069 +.0086), so prediction 4 holds on size and the stop rule is cleared; it beats Muon's recipe by +.0106, `muon-all` by +.0345, the standard baseline by +.0271 and `sym` by +.0332.
+
+This is nearly the design the rule search found, which scored +.0040 against lr-only on worlds 10 to 14, so it is a retest and not a second discovery, and the 1,000-step rule search did not choose Lion.
+
+## Round 5: why q,k, prediction before running
+
+In the map, Lion, Adam, RowNorm and normalized SGD on q,k all beat Muon there by .002 to .004. So the rule may be "q,k does not want Muon" and not "q,k wants Lion". With QK-norm the q and k vectors are normalized, so their length carries nothing, which may be why these matrices don't gain from Muon's control of the update's shape. That is a guess.
+
+Predictions, all at 5s with lrs from world 0 tune rows, one setting per design, worlds 15 to 19:
+
+1. Each of Adam, RowNorm and normalized SGD on q,k beats Muon on q,k by +.002 to +.008; Lion stays highest or within .002 of the highest.
+2. The Lion mix on worlds 10 to 14 beats lr-only by +.003 to +.008, so part of the two worlds' difference is the design and part the worlds.
+3. Without QK-norm, Lion on q,k gains under half of what it gains with QK-norm. I hold this weakly. If it gains as much, QK-norm is not the reason.
