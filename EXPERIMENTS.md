@@ -136,3 +136,23 @@ Predictions, all at 5s with lrs from world 0 tune rows, one setting per design, 
 1. Each of Adam, RowNorm and normalized SGD on q,k beats Muon on q,k by +.002 to +.008; Lion stays highest or within .002 of the highest.
 2. The Lion mix on worlds 10 to 14 beats lr-only by +.003 to +.008, so part of the two worlds' difference is the design and part the worlds.
 3. Without QK-norm, Lion on q,k gains under half of what it gains with QK-norm. I hold this weakly. If it gains as much, QK-norm is not the reason.
+
+### Round 5 results
+
+Worlds 15 to 19 unless noted, 5s tier, one training run per setting per world. Positive means the first rule wins.
+
+| Comparison on q,k | Mean gap | Error | Verdict | Per world |
+|---|---|---|---|---|
+| Lion vs Muon | +.0083 | .0012 | holds | +.0101 +.0088 +.0068 +.0069 +.0086 |
+| Adam vs Muon | +.0077 | .0013 | holds | +.0079 +.0068 +.0057 +.0068 +.0111 |
+| RowNorm vs Muon | +.0063 | .0013 | holds | +.0073 +.0085 +.0049 +.0024 +.0086 |
+| NormSGD vs Muon | +.0056 | .0012 | holds | +.0063 +.0054 +.0018 +.0051 +.0094 |
+| Lion vs Adam | +.0006 | .0012 | tie | +.0022 +.0020 +.0011 +.0001 -.0025 |
+| Lion vs RowNorm | +.0019 | .0011 | tie | +.0028 +.0003 +.0019 +.0045 -.0000 |
+| Lion vs NormSGD | +.0026 | .0010 | tie | +.0038 +.0034 +.0050 +.0018 -.0008 |
+| Lion vs Muon, worlds 10 to 14 | +.0067 | .0011 | holds | +.0082 +.0052 +.0089 +.0045 +.0066 |
+| Lion vs Muon, no QK-norm | +.0039 | .0015 | tie | +.0087 +.0038 +.0045 -.0010 +.0033 |
+
+Prediction 1 held: all three gaps fall inside +.002 to +.008 and Lion is highest. Prediction 2 held: +.0067 is inside +.003 to +.008. Prediction 3 held narrowly: .0039 is 47% of .0083, but the difference between the two gaps was not tested with its own error, so QK-norm is not shown to be the cause.
+
+The rule this supports: q,k does not want Muon. It does not support "q,k wants Lion", because the four other rules tie.
