@@ -399,3 +399,20 @@ Predictions:
 5. Mean gain .254 passes the line, but the verdict is a tie.
 
 New fact I did not predict: without momentum the size ends at 9.3 instead of 27.1. A gradient has no part along a head's rows, so the growth seems to come from momentum, which keeps pushing along old directions the rows have already moved in.
+
+## Round 13: change Muon using what round 12 found
+
+`attnsignal.py`, on world 0 tune rows: the gradient's part along a head's rows is 0.000 in every window, and Muon's step has a part along them of up to .39, so all growth comes from the step. My idea of a release signal, the cosine between the gradient and the head's total move, stays near 0 and does not see a task change, so I dropped it. The cosine between gradient and momentum falls to about .05 once a task is learned and jumps to about .25 at a task change, but it jumps the same in retain and switch, so it can't tell which of the two is happening.
+
+So size growth is a hidden lr schedule, and it starts during first learning, which costs copy and latest. Two changes follow:
+- `muonfade`: per-head, fixed size, lr / (1 + t / 150). This sets the schedule on purpose, stronger than the tau 630 that failed in round 12.
+- `muongate`: per-head, and a head may grow only when the running cosine between gradient and momentum is under .2. The brake then builds after learning. Tau .2 comes from the world 0 table above.
+
+Both pick lr on world 0 with the memory-first cap of round 11, against the same picks for Muon and per-head Muon. Verdicts use worlds 14 to 18, which no run has read. The win rule is unchanged. Rules written for attention so far: 6, plus the 2 used only to explain.
+
+Predictions, written before these ran:
+1. `muonbrake` with tau 150, whole matrix, at lr .02 on worlds 4 to 8: retain.old.nll within .3 of Muon, and switch.new.area within .5. If so, the brake is only a falling angle.
+2. `muonfade` beats per-head Muon on copy.area by at least .2, with retain.old.nll not reversed.
+3. `muongate` beats per-head Muon on copy.area by at least .2 and forgets more than it by at least .2.
+4. Neither passes the full win rule. I put a win at 15%, because 3 of 5 scores must clear both baselines and select barely moves.
+5. If either wins at 600 steps, its gains on area scores shrink by at least half at 2,400 steps.

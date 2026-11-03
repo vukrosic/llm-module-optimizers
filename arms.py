@@ -15,7 +15,7 @@ import json, re
 
 MODULES = ("emb", "head", "qk", "vo", "gu", "down", "norm")
 MOE = ("router", "exp", "ed")
-LRS = dict(adam=.003, muon=.02, muonsplit=.02, muontangent=.02, muonsphere=.02, muonhistory=.02, muonfixed=.02, muonbrake=.02, adamtangent=.003, rownorm=.02, routernorm=.002, polar=.0005, leftpolar=.0005, hybrid=.02, lion=.0005, sgdm=.3, normsgd=.02, softmuon=.02, norm1d=.01, mm_stiefel=.02, mm_dgram=.02, freeze=0, blind=.02)
+LRS = dict(adam=.003, muon=.02, muonsplit=.02, muontangent=.02, muonsphere=.02, muonhistory=.02, muonfixed=.02, muonbrake=.02, muonfade=.02, muongate=.02, adamtangent=.003, rownorm=.02, routernorm=.002, polar=.0005, leftpolar=.0005, hybrid=.02, lion=.0005, sgdm=.3, normsgd=.02, softmuon=.02, norm1d=.01, mm_stiefel=.02, mm_dgram=.02, freeze=0, blind=.02)
 ROWS_IN_COLUMNS = {"down", "ed"}
 
 

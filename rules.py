@@ -103,6 +103,19 @@ def muonbrake(w, g, st, lr, k):
     st["t"] = st.get("t", 0) + 1; muonfixed(w, g, st, lr / (1 + st["t"] / k.get("tau", 630.)), k)
 
 
+def muonfade(w, g, st, lr, k):
+    """muonsphere with a falling lr, lr / (1 + t / tau). Muon's size growth works like a hidden lr schedule, so this sets that schedule on purpose, per head, with no growth. Tau 150 takes lr .02 to .005 by step 450."""
+    st["t"] = st.get("t", 0) + 1; muonsphere(w, g, st, lr / (1 + st["t"] / k.get("tau", 150.)), k)
+
+
+def muongate(w, g, st, lr, k):
+    """Per-head Muon that lets a head grow only once its gradient stops agreeing with its momentum, which is when it has learned what it can. Then the brake builds after learning, not during it. u is the running cosine, and at u of tau or more no growth is allowed."""
+    prev = st["b"].clone() if "b" in st else None; d = nesterov(st, w, g, k.get("beta", .95)); tau, n = k.get("tau", .2), w.shape[0] // int(k.get("h", 4)); u = st.setdefault("u", [tau] * int(k.get("h", 4)))
+    for j, (b, e, x) in enumerate(zip(heads(w, k), heads(d, k), heads(g, k))):
+        if prev is not None: y = prev[j * n:(j + 1) * n]; u[j] = .98 * u[j] + .02 * float((x * y).sum() / (x.norm() * y.norm() + 1e-12))
+        z = newton_schulz(e); keep = max(0., min(1., 1 - u[j] / tau)); b.add_(z - (1 - keep) * (z * b).sum() / ((b * b).sum() + 1e-12) * b, alpha=-lr)
+
+
 def muonhistory(w, g, st, lr, k):
     """muonsphere with Muon's orthogonalization replaced by a sum over training. G adds each step's normalized gradient product on the input side, and the step is the Nesterov direction times G^(-1/2). The step keeps a fixed size, so it goes mostly to input directions that have had little update."""
     d = nesterov(st, w, g, k.get("beta", .95)); st.setdefault("r", [float(b.norm()) for b in heads(w, k)]); n = g / (g.norm() + 1e-7); st.setdefault("G", torch.zeros(w.shape[1], w.shape[1])); st["G"].add_(n.T @ n); e, v = torch.linalg.eigh(st["G"]); e = e.clamp_min(0) + k.get("eps", .01) * e.clamp_min(0).mean() + 1e-12; root = (v / e.sqrt()) @ v.T; z = d @ root
@@ -201,9 +214,9 @@ def blind(w, g, st, lr, k):
     d = torch.randn_like(w); w.add_(d / (d.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
 
 
-RULES = dict(adam=adam, muon=muon, muonsplit=muonsplit, muontangent=muontangent, muonsphere=muonsphere, muonhistory=muonhistory, muonfixed=muonfixed, muonbrake=muonbrake, adamtangent=adamtangent, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
+RULES = dict(adam=adam, muon=muon, muonsplit=muonsplit, muontangent=muontangent, muonsphere=muonsphere, muonhistory=muonhistory, muonfixed=muonfixed, muonbrake=muonbrake, muonfade=muonfade, muongate=muongate, adamtangent=adamtangent, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
              mm_stiefel=mm_stiefel, mm_dgram=mm_dgram, freeze=freeze, blind=blind)
-ONLY_2D = {"muon", "muonsplit", "muontangent", "muonsphere", "muonhistory", "muonfixed", "muonbrake", "adamtangent", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
+ONLY_2D = {"muon", "muonsplit", "muontangent", "muonsphere", "muonhistory", "muonfixed", "muonbrake", "muonfade", "muongate", "adamtangent", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
 ONLY_1D = {"norm1d"}
 MANIFOLD = {"mm_stiefel": "stiefel", "mm_dgram": "dgram"}
 

@@ -10,7 +10,7 @@ SCORES = tuple(attntune.SCORES.values()) + ("majority.area",)
 
 
 def arms_of(lr):
-    return dict(muon=f"qk=muon:{lr:g}", no_momentum=f"qk=muon:{lr:g}:beta=0", no_orthogonalization=f"qk=normsgd:{lr:g}", no_growth=f"qk=muonfixed:{lr:g}", schedule_for_growth=f"qk=muonbrake:{lr:g}", per_head_orthogonalization=f"qk=muonsplit:{lr:g}")
+    return dict(muon=f"qk=muon:{lr:g}", no_momentum=f"qk=muon:{lr:g}:beta=0", no_orthogonalization=f"qk=normsgd:{lr:g}", no_growth=f"qk=muonfixed:{lr:g}", schedule_for_growth=f"qk=muonbrake:{lr:g}", strong_schedule=f"qk=muonbrake:{lr:g}:tau=150", per_head_orthogonalization=f"qk=muonsplit:{lr:g}")
 
 
 if __name__ == "__main__":
