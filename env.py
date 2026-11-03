@@ -230,7 +230,7 @@ def train(a, spec, W=None, out=None):
         os.makedirs(RUNS, exist_ok=True); np.savez_compressed(os.path.join(RUNS, key + ".npz"), **{k: np.asarray(v, np.float32) for k, v in s.items()})
         if a.final:
             hid = evals.run_all(evals.Ctx(model, W, c, "cpu", final=True), "full"); np.savez_compressed(os.path.join(RUNS, "final_" + key + ".npz"), **{k: np.asarray(v, np.float32) for k, v in hid.items()})
-            with open(os.path.join(HERE, "final_results.jsonl"), "a") as f: f.write(json.dumps(dict(key=key, spec=res["spec"], tier=a.tier, world=a.world, scores={k: round(float(np.mean(v)), 4) if len(v) else None for k, v in hid.items()})) + "\n")
+            with open(os.path.join(HERE, os.environ.get("FINAL_RESULTS", "final_results.jsonl")), "a") as f: f.write(json.dumps(dict(key=key, spec=res["spec"], tier=a.tier, world=a.world, scores={k: round(float(np.mean(v)), 4) if len(v) else None for k, v in hid.items()})) + "\n")
     else:
         res["scores"] = {}; res["opt"] = dict(unstable=True, why="not finite")
     with open(out, "a") as f:

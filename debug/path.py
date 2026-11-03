@@ -4,7 +4,7 @@ A self-tie must lose on the sign rule. A planted win (a mixed design against the
 """
 import json, os, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); d = tempfile.mkdtemp(); rel = lambda n: os.path.relpath(os.path.join(d, n), HERE)
-os.environ.update(RESULTS=rel("r.jsonl"), CHOICES=rel("c.jsonl"), JUDGES=rel("j.json"), SPEED=rel("s.jsonl"), FINAL_LOG=rel("f.jsonl"), PAR="6", LOAD="99", OMP_NUM_THREADS="1")
+os.environ.update(RESULTS=rel("r.jsonl"), CHOICES=rel("c.jsonl"), JUDGES=rel("j.json"), SPEED=rel("s.jsonl"), FINAL_LOG=rel("f.jsonl"), FINAL_RESULTS=rel("fr.jsonl"), PAR="6", LOAD="99", OMP_NUM_THREADS="1")
 sys.path.insert(0, HERE); os.chdir(HERE)
 import arms, beat, claims, env, runq
 
