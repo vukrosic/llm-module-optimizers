@@ -23,12 +23,12 @@ def ranks(specs, tier):
 def spec_of(rule, lr, rest=""): return attnenv.parse(f"qk={rule}:{lr:g}" + (";" + rest if rest else ""))
 
 
-def choose(rule, tier, rest=""):
-    base = arms.LRS[rule]; specs = {round(base * m, 6): spec_of(rule, base * m, rest) for m in GRID}; attnenv.run_all(list(specs.values()), tier, (0,), "tune", TUNE_TASKS); rank = ranks(specs, tier); best = min(rank, key=rank.get); print(rule, {k: round(v, 2) for k, v in rank.items()}, "pick", best, {s: round(v, 3) for s, v in scores(specs[best], tier).items()}, "edge of grid" if best in (min(specs), max(specs)) else "", flush=True)
+def choose(rule, tier, rest="", grid=GRID):
+    base = arms.LRS[rule]; specs = {round(base * m, 6): spec_of(rule, base * m, rest) for m in grid}; attnenv.run_all(list(specs.values()), tier, (0,), "tune", TUNE_TASKS); rank = ranks(specs, tier); best = min(rank, key=rank.get); print(rule, {k: round(v, 2) for k, v in rank.items()}, "pick", best, {s: round(v, 3) for s, v in scores(specs[best], tier).items()}, "edge of grid" if best in (min(specs), max(specs)) else "", flush=True)
     with open(os.path.join(attnenv.HERE, CHOICES), "a") as f: f.write(json.dumps(dict(rule=rule, tier=tier, lr=best, rest=rest, spec=arms.show(specs[best]), rank=rank)) + "\n")
     return best
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(); p.add_argument("--rules"); p.add_argument("--tier", default="a"); p.add_argument("--rest", default=""); a = p.parse_args()
-    for r in a.rules.split(","): choose(r, a.tier, a.rest)
+    p = argparse.ArgumentParser(); p.add_argument("--rules"); p.add_argument("--tier", default="a"); p.add_argument("--rest", default=""); p.add_argument("--wider", action="store_true", help="adds two larger lrs for a rule whose pick sat on the top of the grid"); a = p.parse_args()
+    for r in a.rules.split(","): choose(r, a.tier, a.rest, GRID + (8, 16) if a.wider else GRID)

@@ -260,3 +260,48 @@ Drop the idea if `muonsphere` passes no main score against both baselines. The w
 Muon against frozen query and key, worlds 1 to 3, positive means Muon is better: select.area +.636 (error .061), latest.area +.771 (.135), retain.learn.area +1.075 (.175), retain.old.nll +.650 (.312), switch.new.area +1.219 (.507), copy.area +.404 (.275, tie, because world 3 alone gives +.955), majority.area +.033 (.015). A random direction on query and key gives the same picture. Two identical runs on select changed nothing. So select, latest, retain and switch can judge query and key, copy can with care, and majority can't.
 
 Other modules' lrs are Adam .01 on embedding, head and norms, and Muon .005 on value, output and MLP matrices. Muon .0025 scored better on tune rows for retain and switch and worse on latest, but it brings retain.old.nll to .021, where nothing can be measured, so I kept .005. Every arm shares this choice.
+
+### Round 9 results at 600 steps, worlds 4 to 8
+
+Mean test scores, lower is better, errors over worlds in brackets. Each rule has one lr from the same grid on world 0.
+
+| Rule | copy.area | select.area | latest.area | retain.old.nll | switch.new.area |
+|---|---|---|---|---|---|
+| Muon | 2.179 (.114) | .735 (.007) | .943 (.084) | .381 (.113) | 2.431 (.257) |
+| Per-head Muon | 1.668 (.288) | .732 (.009) | .758 (.054) | .590 (.259) | 2.107 (.414) |
+| Adam | 1.544 (.318) | .742 (.025) | .906 (.068) | .536 (.270) | 1.740 (.364) |
+| Lion | 1.898 (.266) | .728 (.007) | .890 (.061) | .173 (.066) | 1.029 (.088) |
+| NormSGD | 2.316 (.028) | .805 (.065) | 1.015 (.068) | .474 (.138) | 1.740 (.291) |
+| Adam, tangent per head | 1.664 (.237) | .740 (.010) | .881 (.082) | 4.203 (.142) | .612 (.067) |
+| Muon, tangent per head | 1.713 (.288) | .708 (.021) | .636 (.026) | 5.252 (.405) | .771 (.050) |
+| Muon on a sphere per head | 1.784 (.352) | .750 (.003) | .675 (.021) | 5.970 (.394) | .789 (.054) |
+
+Query and key size at the end of select in world 4, from a start of 8: Muon 32, per-head Muon 163, tangent 10, sphere 8.
+
+Win rule: `muontangent` wins latest and switch and is reversed on retain. `muonsphere` wins switch and is reversed on retain, and it loses the majority task to Muon by .043. Neither wins.
+
+Predictions:
+1. Held. `muonsphere` beats Muon on switch by +1.642, and per-head Muon by +1.318.
+2. Held. `muonsphere` loses retain to Muon by 5.588, so the plasticity costs memory.
+3. Mostly failed. Copy tie (+.395, error .264), select tie, latest +.268 holds.
+4. Failed. `muontangent` beats per-head Muon on latest (+.122) and switch (+1.336) and loses retain by 4.662. Removing the part along the rows is not small.
+5. Partly held. `muonsplit` beats Muon on copy (+.511) and latest (+.184), and ties on select and switch.
+6. Failed for one rule. `muonsphere` loses majority to Muon by .043, error .017. The rest tie.
+
+The tangent idea on Adam gives the same two changes (retain 4.203, switch .612), so the effect comes from stopping growth and not from Muon. Lion gives the best balance so far: it beats Muon on switch by 1.4 and does not lose retain, and it has no tangent step.
+
+## Round 10: spend a fixed step on directions that got little update
+
+Stopping growth keeps every direction plastic, so old cues get overwritten. A size-based brake can't tell old directions from new ones. A brake per direction can.
+
+`muonhistory` keeps a sum G of normalized gradient products gᵀg for each query and key matrix, in input space. Its step is the Nesterov direction times G^(-1/2), tangent per head, scaled to Muon's Frobenius size, with each head put back at its first size. Muon uses only the current product, so at the first step this is Muon's orthogonalization. Later, directions that received much update get small shares of the step. New cues use new input directions and should get most of the step, while old cues stay in place. When only old directions matter, as in switch, the fixed size means the step is still full.
+
+Accumulating gᵀg comes from AdaGrad and Shampoo (1802.09568). Using only the input-side sum, on a per-head sphere and for query and key, is the part my searches didn't find. That doesn't prove nobody did it.
+
+Predictions, worlds 4 to 8, tuned on world 0 with the same grid:
+1. `muonhistory` has retain.old.nll at most half of `muonsphere`'s 5.970.
+2. Its switch.new.area is within .3 of `muonsphere`'s .789, and it beats Muon there.
+3. Its latest.area beats Muon by at least .1.
+4. It does not win overall, because retain.old.nll stays above Muon's .381. About 60% for this one.
+
+Drop the idea if prediction 1 fails.

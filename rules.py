@@ -92,6 +92,12 @@ def muonsphere(w, g, st, lr, k):
     for b, e, r in zip(heads(w, k), heads(d, k), st["r"]): z = tangent(newton_schulz(e), b); b.add_(z / (z.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr); b.mul_(r / (b.norm() + 1e-12))
 
 
+def muonhistory(w, g, st, lr, k):
+    """muonsphere with Muon's orthogonalization replaced by a sum over training. G adds each step's normalized gradient product on the input side, and the step is the Nesterov direction times G^(-1/2). The step keeps a fixed size, so it goes mostly to input directions that have had little update."""
+    d = nesterov(st, w, g, k.get("beta", .95)); st.setdefault("r", [float(b.norm()) for b in heads(w, k)]); n = g / (g.norm() + 1e-7); st.setdefault("G", torch.zeros(w.shape[1], w.shape[1])); st["G"].add_(n.T @ n); e, v = torch.linalg.eigh(st["G"]); e = e.clamp_min(0) + k.get("eps", .01) * e.clamp_min(0).mean() + 1e-12; root = (v / e.sqrt()) @ v.T; z = d @ root
+    for b, y, r in zip(heads(w, k), heads(z, k), st["r"]): t = tangent(y, b); b.add_(t / (t.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr); b.mul_(r / (b.norm() + 1e-12))
+
+
 def adamtangent(w, g, st, lr, k):
     """Adam with the part along each head's rows removed, which is AdamP's idea (2006.08217) applied to each head of the query and key matrices."""
     a, b = k.get("b1", .9), k.get("b2", .999); st.setdefault("t", 0); st["t"] += 1; st.setdefault("m", torch.zeros_like(w)).mul_(a).add_(g, alpha=1 - a); st.setdefault("v", torch.zeros_like(w)).mul_(b).addcmul_(g, g, value=1 - b); z = (st["m"] / (1 - a ** st["t"])) / ((st["v"] / (1 - b ** st["t"])).sqrt() + 1e-8)
@@ -184,9 +190,9 @@ def blind(w, g, st, lr, k):
     d = torch.randn_like(w); w.add_(d / (d.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
 
 
-RULES = dict(adam=adam, muon=muon, muonsplit=muonsplit, muontangent=muontangent, muonsphere=muonsphere, adamtangent=adamtangent, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
+RULES = dict(adam=adam, muon=muon, muonsplit=muonsplit, muontangent=muontangent, muonsphere=muonsphere, muonhistory=muonhistory, adamtangent=adamtangent, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
              mm_stiefel=mm_stiefel, mm_dgram=mm_dgram, freeze=freeze, blind=blind)
-ONLY_2D = {"muon", "muonsplit", "muontangent", "muonsphere", "adamtangent", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
+ONLY_2D = {"muon", "muonsplit", "muontangent", "muonsphere", "muonhistory", "adamtangent", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
 ONLY_1D = {"norm1d"}
 MANIFOLD = {"mm_stiefel": "stiefel", "mm_dgram": "dgram"}
 
