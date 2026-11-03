@@ -99,3 +99,7 @@ Tuned on tune rows so far: sym 4.145, muon 4.1488, sym-rownorm 4.1519, sym-hybri
 Prediction: on fresh worlds the rule search beats lr-only by +.002 to +.008, and Lion on q and k does not survive at 1,000 steps (the search picks another rule there), because lion-all fell from 6th of 8 at 250 steps to 7th of 8 here, a weak reason. (Corrected after the commit: I first wrote 4th of 8. The predicted numbers are unchanged.) Drop the Lion idea if the search keeps it and the gap to lr-only stays under .002.
 
 Result at 5sx4: the rule search moved no rule away from `sym`, the best recipe, in 193 rule settings, and its lrs refine `sym` only. Against `sym` on fresh worlds: +.0003, error .0008, per world -.0005 +.0012 +.0001 +.0019 -.0013, a tie. Lion on q and k did not survive, as predicted. The predicted +.002 to +.008 over lr-only failed, because the search found only lrs.
+
+## Round 3: 1m, prediction before tuning
+
+Width 64, 4 layers, hidden matrices hold 51%, 1,000 steps. Tune `--from-tier 5sx4`. Predictions: hidden training is worth over .15. Muon beats the standard baseline by .01 to .03. `sym` or `muon` is the best recipe. The rule search changes at most one rule, and its gap on fresh worlds against the best recipe is under .005, so K1 dies at 1m with probability 70%.
