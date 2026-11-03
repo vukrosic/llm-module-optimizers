@@ -66,3 +66,18 @@ At 200 report rows the paired error on `text.web.loss` was 0.006, and the win ru
 3. RowNorm on embedding and head beats Adam there at 5sx4 by .005 to .02, as it did on the old test.
 4. Hybrid against Muon MLP is a tie with equal lr groups, gap under .005 at every tier.
 5. K1: the rule search wins on tune rows by .005 to .02 and keeps at most half of that on fresh worlds. Probability of clearing K1 at both 5s and 1m is about 25%. If it dies, the negative result (per-module rules add nothing beyond per-module lrs under one protocol) is the paper's main claim.
+
+## More closest work, read November 3, 2026
+
+- 2605.09176 (survey, "Navigating LLM Valley") lists whether optimizer assignment can be learned or adapted as an open question. arXiv 2608.28557 (survey) gives a routing table by parameter class. Both are hand assignment.
+- 1709.07417 searches for one update equation on a ConvNet on CIFAR-10. Abstract only read: it does not say whether rules differ by layer.
+- 2605.04055 (MetaAdamW) and SGG (ACL 2025) modulate lr per group, with no choice of rule, so both belong on the lr side of our question.
+- Celo and Celo2 (2501.12670, 2602.19142) learn per-parameter rules, not rules assigned per module. Not read in full.
+
+Two extended searches found no per-module rule search on transformers with lr tuned per arm. That does not show none exists, so any write-up says "we did not find one", and these full texts still need reading before that sentence is used.
+
+## Test version 3 at 5s, baselines (one training run per setting per world, 5 worlds, report rows)
+
+Prediction 1 holds: hidden training is worth .103 (21x the floor). Prediction 2 fails at 5s: Muon beats the standard baseline by +.0162, error .0015, same sign in all 5 worlds; I predicted a tie. Prediction 4 holds: hybrid against Muon MLP -.0008, a tie. RowNorm on embedding and head loses to Adam there by -.0239 at 250 steps. All-Stiefel loses to unconstrained by -.0338 at 250 steps, which reverses the paper's 50k-step result on GPT-2 small, so length or size may explain it. Stiefel attention + DGram MLP against All-Stiefel: tie. Jitter sd .0004, world spread about .003. Leak: report -.128, tune -.027. Double: 384,000 tokens, 2 gradients per step.
+
+Commit before the 5s rule search. K1 prediction stays as written above.
