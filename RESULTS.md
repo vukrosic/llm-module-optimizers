@@ -249,9 +249,51 @@ Per-head Muon ties Muon on every score here. `muonhistory` ties Muon on relearni
 
 Query-key normalization makes each head's block of rows scale-invariant, so the gradient has no part along it. Muon's orthogonalized step does have one, so the matrix grows. From a starting size of 8, 600 steps gave 32 for Muon, 163 for per-head Muon at lr .08, 10 for the tangent rule and 8 for the sphere rule. A larger matrix turns by a smaller angle per step. Our reading, not tested on its own, is that this growth acts as a brake: stopping it gives fast relearning and heavy forgetting.
 
+### What each part of Muon does
+
+One part removed at a time, at Muon's lr .02 with no tuning, worlds 4 to 8.
+
+| Arm | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area | size at end |
+|---|---|---|---|---|---|---|---|
+| Muon | 2.179 | .735 | .943 | .381 | 2.431 | .911 | 27.1 |
+| No momentum | 2.316 | .741 | 1.070 | .793 | 1.251 | .897 | 9.3 |
+| No orthogonalization | 2.121 | .912 | .908 | .695 | 1.355 | .957 | 36.1 |
+| No growth (`muonfixed`) | 1.697 | .734 | .785 | 4.487 | 1.216 | .927 | 8.0 |
+| Weak schedule, no growth (`muonbrake`, tau 630) | 1.961 | .727 | .811 | 1.989 | 1.520 | .922 | 8.0 |
+| Strong schedule, no growth (`muonbrake`, tau 150) | 2.168 | .741 | .929 | .294 | 2.322 | .914 | 8.0 |
+| Per-head orthogonalization | 1.926 | .726 | .754 | .476 | 1.310 | .907 | 32.0 |
+
+No growth: copy +.482, latest +.158 and switch +1.215 hold, and retain -4.105 is reversed. Strong schedule: every gap to Muon is a tie and none passes .109. On world 0 tune rows, the gradient's part along a head's rows is 0.000 in every window, and Muon's step has a part along them of up to .39 (`attnsignal.py`). So growth comes from the step, mostly through momentum, and it works as a falling lr.
+
+Muon is not best on every score: on these rows every other arm relearns better than it does. What it has is memory at a low cost to the rest. The cosine between gradient and the head's total move did not see a task change, and the cosine between gradient and momentum jumps the same in retain and switch, so neither tells a task that adds from a task that replaces.
+
+### Two changes to Muon
+
+`muonfade` is per-head with fixed size and lr / (1 + t / 150). `muongate` is per-head, and a head may grow only when the running cosine between gradient and momentum is under .2. Picks on world 0 with the memory-first cap, verdicts on worlds 14 to 18, which no run had read.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | 1.568 (.184) | .737 (.006) | 1.004 (.086) | .651 (.172) | 1.808 (.368) | .904 (.014) |
+| Per-head Muon | .08 | 2.032 (.207) | .820 (.110) | .876 (.087) | .478 (.198) | 1.577 (.252) | .916 (.016) |
+| Per-head Muon, not the pick | .02 | 1.588 | .727 | .892 | .716 | 1.900 | .896 |
+| `muonfade` | .02 | 1.441 (.239) | .728 (.013) | .801 (.059) | .312 (.097) | 2.456 (.314) | .902 (.007) |
+| `muongate` | .04 | 1.695 (.205) | .733 (.038) | .778 (.047) | .388 (.198) | 1.402 (.191) | .904 (.007) |
+
+| Comparison, positive means the new rule is better | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| `muonfade` vs Muon | +.126 tie | +.009 tie | +.203 holds | +.339 holds | -.648 tie | +.003 tie |
+| `muonfade` vs per-head .08 | +.591 holds | +.092 tie | +.075 tie | +.167 tie | -.879 reversed | +.014 tie |
+| `muongate` vs Muon | -.127 tie | +.004 tie | +.226 holds | +.263 tie | +.406 tie | +.000 tie |
+| `muongate` vs per-head .08 | +.337 holds | +.087 tie | +.098 tie | +.090 tie | +.175 tie | +.012 tie |
+| `muongate` vs per-head .02 | -.107 tie | -.007 tie | +.114 holds | +.328 tie | +.499 tie | -.008 tie |
+
+Neither passes the win rule. At 2,400 steps, worlds 14 to 16, same lrs, `muongate` ties both baselines on every score (Muon .018/.005/.006/.669/.244; per-head .294/.002/.007/.405/1.120; `muongate` .218/.005/.008/.263/.003, in the order copy, select, latest, retain, switch). `muonfade` did not run at that length.
+
+Six rules were written for attention and two more only to explain. Muon's copy.area moved from 2.007 on worlds 9 to 13 to 1.568 on worlds 14 to 18, so five worlds are few for gaps of this size.
+
 ### What did not run for attention
 
-Width 96 did not run, and time per step was not judged, because no rule passed the scores first. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
+Width 96 did not run, and time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
 
 ### Commands for attention
 
@@ -260,6 +302,11 @@ python3 check.py                                               # includes the ne
 python3 attncontrols.py                                        # frozen and random controls
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11,12,13 --tier a
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11 --tier ax4 --rules muon,muonsplit,muonsphere,muonhistory
+python3 attnparts.py --worlds 4,5,6,7,8                        # removes one part of Muon at a time
+python3 attnsignal.py                                          # size, growth and task-change signals on world 0
+ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 14,15,16,17,18 --rules muon,muonsplit,muonfade,muongate
+ATTN_CHOICES=attn_choices_memory.jsonl python3 attnlong.py --rules muonsplit,muongate --worlds 14,15,16
+python3 attnvs.py "qk=muongate:.04" "qk=muonsplit:.02"         # one spec against another
 python3 chart_attention.py                                     # draws attention.png
 ```
 

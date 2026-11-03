@@ -5,7 +5,7 @@
 >
 > **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
 >
-> **On attention alone, we wrote four new update rules. None beat both Muon and per-head Muon by the rule we wrote first.**
+> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, is reversed by neither on any score.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
@@ -126,7 +126,22 @@ Lower is better. These are mean losses over 5 worlds no run had read, with one t
 
 > **At 2,400 steps every rule solves the tasks, `muonhistory`'s relearning gain over Muon is a tie (.030 vs .051), and its forgetting is much worse (6.388 vs .256).**
 
-The size growth seems to act as a brake on learning. Removing it relearns faster and overwrites old cues. We don't know yet whether a rule can keep both. Per-head Muon's sources and the numbers for all nine rules are in [RESULTS.md](RESULTS.md).
+Per-head Muon's sources and the numbers for all rules are in [RESULTS.md](RESULTS.md).
+
+### Treat Muon's growth in query and key as a hidden learning rate schedule
+
+We removed one part of Muon at a time. With size held fixed, forgetting went from .381 to 4.487. With a falling learning rate added at that fixed size, the model matched Muon on every score, so the growth works as a schedule. Almost no growth happens without momentum: the size ended at 9.3 instead of 27.1.
+
+That growth also starts during first learning, when the model still has most to learn. **`muongate`** lets a head grow only after its gradient stops agreeing with its momentum.
+
+| Rule, 600 steps, 5 new worlds | Copy | Read latest | Remember old cues | Relearn |
+|---|---|---|---|---|
+| Muon | 1.568 | 1.004 | .651 | 1.808 |
+| Per-head Muon | 2.032 | .876 | .478 | 1.577 |
+| **`muongate`** | 1.695 | **.778** | **.388** | **1.402** |
+
+> **Against Muon, only its gain on reading the latest token clears the noise, and that gain is gone by 2,400 steps. Treat `muongate` as the next rule to test, not as a result.**
+
 
 ---
 

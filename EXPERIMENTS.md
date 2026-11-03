@@ -416,3 +416,48 @@ Predictions, written before these ran:
 3. `muongate` beats per-head Muon on copy.area by at least .2 and forgets more than it by at least .2.
 4. Neither passes the full win rule. I put a win at 15%, because 3 of 5 scores must clear both baselines and select barely moves.
 5. If either wins at 600 steps, its gains on area scores shrink by at least half at 2,400 steps.
+
+### Round 13 results
+
+`muonbrake` with tau 150 at lr .02, worlds 4 to 8, size held at 8.0: copy 2.168, select .741, latest .929, retain .294, switch 2.322, majority .914, against Muon's 2.179, .735, .943, .381, 2.431, .911. Every gap is a tie and none passes .109. So Muon's size growth works as a hidden falling lr, and a schedule can replace it.
+
+Picks: `muonfade` lr .02, `muongate` lr .04. Worlds 14 to 18, none read before, 600 steps. Errors over worlds in brackets.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area | size at end |
+|---|---|---|---|---|---|---|---|---|
+| Muon | .02 | 1.568 (.184) | .737 (.006) | 1.004 (.086) | .651 (.172) | 1.808 (.368) | .904 (.014) | 26.7 |
+| Per-head Muon | .08 | 2.032 (.207) | .820 (.110) | .876 (.087) | .478 (.198) | 1.577 (.252) | .916 (.016) | 130.6 |
+| Per-head Muon, not the pick | .02 | 1.588 | .727 | .892 | .716 | 1.900 | .896 | 31.9 |
+| `muonfade` | .02 | 1.441 (.239) | .728 (.013) | .801 (.059) | .312 (.097) | 2.456 (.314) | .902 (.007) | 8.0 |
+| `muongate` | .04 | 1.695 (.205) | .733 (.038) | .778 (.047) | .388 (.198) | 1.402 (.191) | .904 (.007) | 58.7 |
+
+Paired gaps, positive means the new rule is better:
+
+| Comparison | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| `muonfade` vs Muon | +.126 tie | +.009 tie | +.203 holds | +.339 holds | -.648 tie | +.003 tie |
+| `muonfade` vs per-head .08 | +.591 holds | +.092 tie | +.075 tie | +.167 tie | -.879 reversed | +.014 tie |
+| `muongate` vs Muon | -.127 tie | +.004 tie | +.226 holds | +.263 tie | +.406 tie | +.000 tie |
+| `muongate` vs per-head .08 | +.337 holds | +.087 tie | +.098 tie | +.090 tie | +.175 tie | +.012 tie |
+| `muongate` vs per-head .02 | -.107 tie | -.007 tie | +.114 holds | +.328 tie | +.499 tie | -.008 tie |
+
+Neither passes the win rule: no score clears both baselines. `muongate` is the first rule here that neither baseline reverses on any score. Its mean is better than Muon's on 4 of 5 main scores and worse on copy.
+
+2,400 steps, worlds 14 to 16, same lrs, not retuned. `muonfade` did not run here, because it was already reversed at 600 steps and the Mac was busy.
+
+| Rule | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|
+| Muon | .018 (.005) | .005 (.004) | .006 (.002) | .669 (.362) | .244 (.243) | .234 (.006) |
+| Per-head Muon .08 | .294 (.139) | .002 (.001) | .007 (.001) | .405 (.124) | 1.120 (.696) | .255 (.014) |
+| `muongate` | .218 (.113) | .005 (.002) | .008 (.006) | .263 (.135) | .003 (.001) | .255 (.007) |
+
+`muongate` ties both baselines on every score at 2,400 steps. Its means on memory and relearning are better, and Muon's mean on copy is better, with only 3 worlds.
+
+Predictions:
+1. Held. All gaps are within .109, inside both lines.
+2. Held against the per-head pick .08. At lr .02 per-head Muon's copy is 1.588, so the gain depends on that pick.
+3. Half held. Copy +.337 passes, but `muongate` forgets less than per-head Muon in the mean, not more.
+4. Held. Neither passes.
+5. Not tested as written, because neither won. `muongate`'s one clear gain over Muon, latest +.226, is -.001 at 2,400 steps, because every rule solves latest by then.
+
+Rules written for attention so far: 6, plus 2 used only to explain. With this many tries and world-to-world spread this large, Muon's copy moved from 2.007 on worlds 9 to 13 to 1.568 here, so these gaps need more worlds before anyone relies on them.
