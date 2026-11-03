@@ -96,4 +96,4 @@ Result: lr-only (155 settings) against Muon: +.0033, error .0019, a tie. Rule se
 
 Tuned on tune rows so far: sym 4.145, muon 4.1488, sym-rownorm 4.1519, sym-hybrid-all 4.1577, standard 4.1636, rownorm-all 4.1685, lion-all 4.1844, normsgd-all 4.1979. The search starts from `sym`, the best recipe.
 
-Prediction: on fresh worlds the rule search beats lr-only by +.002 to +.008, and Lion on q and k does not survive at 1,000 steps (the search picks another rule there), because lion-all fell from 4th of 8 at 250 steps to 7th of 8 here. Drop the Lion idea if the search keeps it and the gap to lr-only stays under .002.
+Prediction: on fresh worlds the rule search beats lr-only by +.002 to +.008, and Lion on q and k does not survive at 1,000 steps (the search picks another rule there), because lion-all fell from 6th of 8 at 250 steps to 7th of 8 here, a weak reason. (Corrected after the commit: I first wrote 4th of 8. The predicted numbers are unchanged.) Drop the Lion idea if the search keeps it and the gap to lr-only stays under .002.
