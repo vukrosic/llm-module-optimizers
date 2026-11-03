@@ -55,6 +55,8 @@ with stage("each rule takes its published step"):
     assert (step("rownorm", t=True).norm(dim=0) - 1).abs().max() < 1e-4, "rownorm on columns"
     p0 = step("polar", alpha=0.0); M = g * .05; U, S, Vt = torch.linalg.svd(M, full_matrices=False); assert (p0 - U @ Vt).abs().max() < 1e-2, "polar with alpha 0 should be the polar factor"
     p1 = step("polar", alpha=1.0); assert abs(float(p1.norm() / p0.norm()) - float(S.sum())) < 1e-2, "polar with alpha 1 should scale by the nuclear norm"
+    s0 = torch.linalg.svdvals(step("softmuon", p=0.0)); assert (s0 - s0[0]).abs().max() < 1e-3 and abs(float(s0.norm()) - 32 ** .5) < 1e-3, f"softmuon p 0 should have equal singular values of Frobenius size sqrt(m), got {s0}"
+    assert (step("softmuon", p=1.0) - step("normsgd")).abs().max() < 1e-3, "softmuon p 1 should equal normsgd"
     wr = torch.randn(32, 8); gr = torch.randn(32, 8); z = step("routernorm", shape_w=wr, grad=gr); assert z.mean(0).abs().max() < 1 and float((z.sum(1)).abs().max()) < 1e3
     assert (step("lion").abs() - 1).abs().max() < 1e-3, "lion should be a sign"
     w1 = torch.randn(12); assert float(step("norm1d", shape_w=w1, grad=torch.randn(12)).norm()) > 0

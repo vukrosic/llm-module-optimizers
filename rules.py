@@ -11,6 +11,7 @@ Ported from the papers, with what was adapted:
 - adam: betas .9, .95 with a decoupled decay knob `wd`, default 0.
 - lion: sign of momentum, beta .9, from Chen et al. 2023.
 - sgdm: heavy ball. normsgd: Muon's Nesterov direction scaled to Muon's Frobenius size sqrt(m), with no orthogonalization.
+- softmuon: not from a paper, written here. It keeps singular values raised to a power p, so it runs from Muon (p 0) to normsgd (p 1).
 
 Controls: freeze never moves. blind takes a random direction with Muon's Frobenius size, so it must lose to everything that reads gradients.
 
@@ -108,6 +109,11 @@ def normsgd(w, g, st, lr, k):
     d = nesterov(st, w, g, k.get("beta", .95)); w.add_(d / (d.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
 
 
+def softmuon(w, g, st, lr, k):
+    """One knob between Muon and normsgd: singular values of the Nesterov direction raised to p, then scaled to their Frobenius size sqrt(m). p 0 is exact orthogonalization, p 1 is normsgd. Uses an exact SVD."""
+    d = nesterov(st, w, g, k.get("beta", .95)); U, S, Vt = torch.linalg.svd(d / (d.norm() + 1e-7), full_matrices=False); Z = (U * S ** k.get("p", .5)) @ Vt; w.add_(Z / (Z.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
+
+
 def norm1d(w, g, st, lr, k):
     d = nesterov(st, w, g, k.get("beta", .95)); w.add_(d / (d.norm() + 1e-7) * w.numel() ** 0.5, alpha=-lr)
 
@@ -145,9 +151,9 @@ def blind(w, g, st, lr, k):
     d = torch.randn_like(w); w.add_(d / (d.norm() + 1e-7) * w.shape[0] ** 0.5, alpha=-lr)
 
 
-RULES = dict(adam=adam, muon=muon, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, norm1d=norm1d,
+RULES = dict(adam=adam, muon=muon, rownorm=rownorm, routernorm=routernorm, polar=polar, leftpolar=leftpolar, hybrid=hybrid, lion=lion, sgdm=sgdm, normsgd=normsgd, softmuon=softmuon, norm1d=norm1d,
              mm_stiefel=mm_stiefel, mm_dgram=mm_dgram, freeze=freeze, blind=blind)
-ONLY_2D = {"muon", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "mm_stiefel", "mm_dgram"}
+ONLY_2D = {"muon", "rownorm", "routernorm", "polar", "leftpolar", "hybrid", "normsgd", "softmuon", "mm_stiefel", "mm_dgram"}
 ONLY_1D = {"norm1d"}
 MANIFOLD = {"mm_stiefel": "stiefel", "mm_dgram": "dgram"}
 

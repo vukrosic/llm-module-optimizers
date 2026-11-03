@@ -156,3 +156,18 @@ Worlds 15 to 19 unless noted, 5s tier, one training run per setting per world. P
 Prediction 1 held: all three gaps fall inside +.002 to +.008 and Lion is highest. Prediction 2 held: +.0067 is inside +.003 to +.008. Prediction 3 held narrowly: .0039 is 47% of .0083, but the difference between the two gaps was not tested with its own error, so QK-norm is not shown to be the cause.
 
 The rule this supports: q,k does not want Muon. It does not support "q,k wants Lion", because the four other rules tie.
+
+## Round 6: can one rule with one knob replace the mix?
+
+Every rule that beats Muon on q,k keeps some of the gradient's singular-value shape, and Muon flattens it completely. So I add `softmuon`: singular values raised to a power p, which runs from Muon (p 0) to normsgd (p 1). This rule is not from a paper.
+
+Picks use tune rows of world 0. Verdicts use worlds 15 to 19, and worlds 21 to 23 have never been read.
+
+Predictions, written before any run:
+
+1. Control: p 0 on q,k lands within .002 of Muon on tune rows.
+2. On q,k, every p from .25 up beats Muon on tune rows, and the best soft setting beats lr-only by +.004 to +.010 on fresh worlds and ties Lion there.
+3. On value and output matrices the cost rises with p, and p .75 costs more than .015 on tune rows. On gate/up and down, the best p is at most .25 and moves tune rows by under .003.
+4. The best single p on all four hidden modules loses to the mix (Lion on q,k) by +.002 to +.008. If it ties, one rule with one p is enough for hidden matrices, and I drop the claim that hidden matrices need two rules.
+5. One rule on every matrix (Muon, Lion, RowNorm or NormSGD) loses to the mix by more than +.025 on fresh worlds. Norm scales stay on Adam in these arms, because the matrix rules can't run on vectors.
+6. On worlds 21 to 23, the mix beats lr-only by +.004 to +.012.
