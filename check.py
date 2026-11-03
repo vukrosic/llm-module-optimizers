@@ -71,6 +71,12 @@ with stage("each rule takes its published step"):
     for _ in range(30): rules.muonhistory(w, ga, st, 1e-5, dict(h=2))
     st["b"].zero_(); before = w.clone(); rules.muonhistory(w, ga + gb, st, .01, dict(h=2, beta=0.)); mv = w - before; assert mv[:, 1].norm() > 3 * mv[:, 0].norm(), "muonhistory should favour the input direction with little history"
     for b, r in zip(per(w), first): assert abs(float(b.norm()) - r) < 1e-4, "muonhistory should hold each head's size"
+    for rule in ("muonfixed", "muonbrake"):
+        w, st = hw.clone(), {}; first = [float(b.norm()) for b in per(w)]
+        for _ in range(50): rules.RULES[rule](w, torch.randn(8, 8), st, .05, dict(h=2))
+        for b, r in zip(per(w), first): assert abs(float(b.norm()) - r) < 1e-4, f"{rule} should hold each head's size"
+        assert (w - hw).abs().max() > .01, f"{rule} should move the rows"
+    ga_ = torch.randn(8, 8); x, y = hw.clone(), hw.clone(); rules.muonfixed(x, ga_, {}, .05, dict(h=2)); rules.muonbrake(y, ga_, dict(t=630), .05, dict(h=2, tau=630)); assert (y - hw).norm() < .6 * (x - hw).norm(), "muonbrake should turn less later in training"
     wr = torch.randn(32, 8); gr = torch.randn(32, 8); z = step("routernorm", shape_w=wr, grad=gr); assert z.mean(0).abs().max() < 1 and float((z.sum(1)).abs().max()) < 1e3
     assert (step("lion").abs() - 1).abs().max() < 1e-3, "lion should be a sign"
     w1 = torch.randn(12); assert float(step("norm1d", shape_w=w1, grad=torch.randn(12)).norm()) > 0

@@ -362,3 +362,16 @@ Predictions:
 4. Not tested as written, because no rule won at 600 steps. The nearest case is `muonhistory`'s switch gain, which fell from +1.476 to +.021.
 
 Result: I wrote four rules, and none beats Muon and per-head Muon together. `muonhistory` relearns fastest at 600 steps, at a cost in memory, and the gain is gone by 2,400 steps. The published per-head Muon is the safest choice on these tasks at 600 steps.
+
+## Round 12: which part of Muon does the work?
+
+Muon has three parts on query and key: momentum, orthogonalization, and the size growth that comes with its step. Each arm removes one part at Muon's lr .02, with no tuning, on worlds 4 to 8, so a gap to Muon is that part's effect. Worlds 4 to 8 have been read before, and these runs only explain, so no verdict on a new rule comes from them.
+
+Arms: no momentum (beta 0); no orthogonalization (`normsgd`, the same step size); no growth (`muonfixed`, Muon's step, then each head back at its first size); a schedule in place of growth (`muonbrake`, `muonfixed` with lr / (1 + t / 630), because Muon's size at lr .02 doubles in about 630 steps); per-head orthogonalization (`muonsplit` at lr .02).
+
+Predictions, written before any of these ran:
+1. No growth relearns better than Muon by at least .3 on switch.new.area and forgets more by at least .3 on retain.old.nll. If it does neither, size growth is not the brake and I drop that explanation.
+2. The schedule lands within .2 of Muon on retain.old.nll and within .3 on switch.new.area. If so, the brake is only a falling angle, and a rule can set it on purpose.
+3. No momentum loses at least .3 on copy.area or switch.new.area.
+4. No orthogonalization loses at least .03 on select.area.
+5. Per-head orthogonalization at the same lr beats Muon on copy.area by at least .2.

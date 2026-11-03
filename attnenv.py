@@ -16,7 +16,7 @@ import arms, env, rules
 
 HERE = os.path.dirname(os.path.abspath(__file__)); RUNS = os.path.join(HERE, "runs_attn"); RESULTS = os.environ.get("ATTN_RESULTS", "attn_results.jsonl")
 TIERS = {"tiny": dict(width=16, layers=1, heads=2, steps=20, n=32), "a": dict(width=48, layers=2, heads=4, steps=600, n=512), "ax4": dict(width=48, layers=2, heads=4, steps=2400, n=512), "b": dict(width=96, layers=2, heads=4, steps=600, n=512)}
-PER_HEAD = ("muonsplit", "muontangent", "muonsphere", "muonhistory", "adamtangent"); SHARE = dict(copy=1, select=1, latest=1, majority=.25, retain=1, switch=1); V, SEP = 64, 0; BATCH = 16; TASKS = ("copy", "select", "latest", "majority", "retain", "switch"); VERSION = 3
+PER_HEAD = ("muonsplit", "muontangent", "muonsphere", "muonhistory", "muonfixed", "muonbrake", "adamtangent"); SHARE = dict(copy=1, select=1, latest=1, majority=.25, retain=1, switch=1); V, SEP = 64, 0; BATCH = 16; TASKS = ("copy", "select", "latest", "majority", "retain", "switch"); VERSION = 3
 REST = "emb=adam:.01;head=adam:.01;norm=adam:.01;vo=muon:.005;gu=muon:.005;down=muon:.005"
 CUES_A, CUES_B = (1, 5), (5, 9)
 
