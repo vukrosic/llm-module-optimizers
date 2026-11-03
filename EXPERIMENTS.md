@@ -325,3 +325,40 @@ Predictions, written before any of these picks ran:
 2. `muonhistory` beats Muon on switch.new.area by at least .3, and is not reversed on retain.old.nll. This is the case for a brake that helps, so it is the result I most want to see, and I put it at 40%.
 3. Lion beats Muon on switch.new.area by at least .3 with no reversal on any main score.
 4. If any rule wins at 600 steps, its gain on area scores shrinks by at least half at 2,400 steps.
+
+### Round 11 results, memory-first picks
+
+600 steps, worlds 9 to 13, none read before. Mean scores, lower is better, errors over worlds in brackets.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | 2.007 (.196) | .748 (.010) | .955 (.052) | .493 (.230) | 2.153 (.474) | .890 (.022) |
+| Per-head Muon | .08 | 1.546 (.220) | .748 (.011) | .823 (.029) | .231 (.117) | 1.980 (.295) | .901 (.009) |
+| Adam | .048 | 1.378 (.239) | .767 (.025) | .950 (.027) | .265 (.096) | 1.679 (.506) | .926 (.016) |
+| Lion | .002 | 2.105 (.156) | .755 (.024) | .846 (.046) | .341 (.156) | 1.548 (.416) | .916 (.022) |
+| NormSGD | .04 | 1.561 (.304) | .874 (.066) | .981 (.023) | .595 (.263) | 1.191 (.468) | .954 (.013) |
+| Adam, tangent per head | .012 | 1.451 (.192) | .775 (.037) | .742 (.043) | 3.384 (.414) | 1.047 (.503) | .925 (.019) |
+| Muon, tangent per head | .005 | 2.218 (.094) | .751 (.014) | .945 (.062) | .261 (.076) | 1.335 (.418) | .894 (.017) |
+| Muon on a sphere per head | .005 | 2.215 (.097) | .750 (.014) | .945 (.064) | .161 (.044) | 1.596 (.293) | .894 (.017) |
+| `muonhistory` | .01 | 1.952 (.251) | .737 (.004) | .846 (.095) | 1.421 (.343) | .677 (.059) | .911 (.023) |
+
+Adam's pick sits on the top of its grid. Against Muon: per-head Muon wins copy (+.462) and latest (+.132) and ties the rest. `muonhistory` wins switch (+1.476), ties retain (-.927, error .343) and loses majority by .022. Against per-head Muon, `muonhistory` wins switch (+1.303) and is reversed on copy (-.407) and retain (-1.190). No rule passes the win rule.
+
+2,400 steps, worlds 9 to 11, same lrs, not retuned:
+
+| Rule | copy.area | select.area | latest.area | retain.old.nll | switch.new.area |
+|---|---|---|---|---|---|
+| Muon | .182 (.127) | .002 (.001) | .007 (.005) | .256 (.069) | .051 (.050) |
+| Per-head Muon | .030 (.021) | .002 (.001) | .003 (.002) | .380 (.206) | .701 (.346) |
+| Muon on a sphere per head | .440 (.109) | .009 (.004) | .004 (.002) | 2.785 (1.323) | .002 (.000) |
+| `muonhistory` | .213 (.126) | .004 (.003) | .010 (.003) | 6.388 (1.184) | .030 (.025) |
+
+Every rule solves the tasks by then. `muonhistory`'s switch gain over Muon falls from +1.476 to +.021 (tie), and its forgetting stays at 6.388 against Muon's .256 (reversed).
+
+Predictions:
+1. Held. No tangent or sphere rule wins. Muon tangent and sphere fall to copy about 2.2 at lr .005. Adam tangent's cap on world 0 did not carry over: its retain.old.nll is 3.384 on fresh worlds.
+2. Held against Muon only: switch +1.476 and retain not reversed. Per-head Muon reverses it on retain.
+3. Failed. Lion's switch gain is +.605 and a tie, and majority is reversed by .026.
+4. Not tested as written, because no rule won at 600 steps. The nearest case is `muonhistory`'s switch gain, which fell from +1.476 to +.021.
+
+Result: I wrote four rules, and none beats Muon and per-head Muon together. `muonhistory` relearns fastest at 600 steps, at a cost in memory, and the gain is gone by 2,400 steps. The published per-head Muon is the safest choice on these tasks at 600 steps.

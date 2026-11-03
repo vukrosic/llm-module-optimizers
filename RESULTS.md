@@ -182,6 +182,93 @@ python3 search.py tune muon-all --tier 5sx4 --from-tier 5s
 python3 embhead.py --tier 5sx4
 ```
 
+## Attention environment
+
+One part of the LLM at a time: only the query and key rule changes, and the other modules keep one fixed recipe (`attnenv.py`). The model has 2 layers, width 48 and 4 heads, on tiny token tasks. The rule, written before any new rule ran, is in `attnbeat.py`: against Muon and per-head Muon, win at least 3 of 5 main scores (copy, select, latest, remember, relearn) by .02 and 2 errors, with none reversed, majority tied, the same at 4x steps and 2x width, and at most 1.25x the time per step.
+
+Scores are mean test loss. `.area` is the mean over 5 points of the training curve, and `retain.old.nll` is loss on old cues at the end. Each world gets one training run per setting.
+
+### The tasks can tell a trained attention from a broken one
+
+Muon against frozen query and key, worlds 1 to 3, positive means training helps:
+
+| Score | Gap | Verdict |
+|---|---|---|
+| select.area | +.636 | holds |
+| latest.area | +.771 | holds |
+| retain.learn.area | +1.075 | holds |
+| retain.old.nll | +.650 | holds |
+| switch.new.area | +1.219 | holds |
+| copy.area | +.404 | tie; one world had +.955 |
+| majority.area | +.033 | small, so it is not a main score |
+
+A random step direction gave similar gaps. Two runs of one setting were identical. Frozen query and key can solve some induction tasks (https://arxiv.org/html/2506.01115v2), which is why this control is required and why the first select task was replaced.
+
+### All rules at 600 steps, lrs picked for memory first
+
+Lrs were picked on world 0, among lrs with retain.old.nll under 1, from a grid of .125 to 16 times each default. Reported on worlds 9 to 13, which no run had read. Errors over worlds are in brackets.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | 2.007 (.196) | .748 (.010) | .955 (.052) | .493 (.230) | 2.153 (.474) | .890 (.022) |
+| Per-head Muon | .08 | 1.546 (.220) | .748 (.011) | .823 (.029) | .231 (.117) | 1.980 (.295) | .901 (.009) |
+| Adam | .048 | 1.378 (.239) | .767 (.025) | .950 (.027) | .265 (.096) | 1.679 (.506) | .926 (.016) |
+| Lion | .002 | 2.105 (.156) | .755 (.024) | .846 (.046) | .341 (.156) | 1.548 (.416) | .916 (.022) |
+| NormSGD | .04 | 1.561 (.304) | .874 (.066) | .981 (.023) | .595 (.263) | 1.191 (.468) | .954 (.013) |
+| Adam, tangent per head (new here) | .012 | 1.451 (.192) | .775 (.037) | .742 (.043) | 3.384 (.414) | 1.047 (.503) | .925 (.019) |
+| Muon, tangent per head (new here) | .005 | 2.218 (.094) | .751 (.014) | .945 (.062) | .261 (.076) | 1.335 (.418) | .894 (.017) |
+| Muon on a sphere per head (new here) | .005 | 2.215 (.097) | .750 (.014) | .945 (.064) | .161 (.044) | 1.596 (.293) | .894 (.017) |
+| `muonhistory` (new here) | .01 | 1.952 (.251) | .737 (.004) | .846 (.095) | 1.421 (.343) | .677 (.059) | .911 (.023) |
+
+Adam's pick sits on the top of its grid. Adam tangent's memory cap on world 0 did not carry over to fresh worlds.
+
+Paired verdicts, positive means the first rule is better:
+
+| Comparison | Holds | Tie | Reversed |
+|---|---|---|---|
+| Per-head Muon vs Muon | copy +.462, latest +.132 | select, retain, switch, majority | none |
+| `muonhistory` vs Muon | switch +1.476 | retain -.927 | majority -.022 |
+| `muonhistory` vs per-head Muon | switch +1.303 | | copy -.407, retain -1.190 |
+
+No rule passes the win rule. With lrs picked by mean rank instead, on worlds 4 to 8, the new rules relearned and read the latest token better and forgot far more (retain.old.nll 4.658 to 5.970 against Muon's .381), and also did not pass. That table is round 9 and round 10 in [EXPERIMENTS.md](EXPERIMENTS.md).
+
+### The same rules at 2,400 steps
+
+Worlds 9 to 11, same lrs, not retuned.
+
+| Rule | copy.area | select.area | latest.area | retain.old.nll | switch.new.area |
+|---|---|---|---|---|---|
+| Muon | .182 (.127) | .002 (.001) | .007 (.005) | .256 (.069) | .051 (.050) |
+| Per-head Muon | .030 (.021) | .002 (.001) | .003 (.002) | .380 (.206) | .701 (.346) |
+| Muon on a sphere per head | .440 (.109) | .009 (.004) | .004 (.002) | 2.785 (1.323) | .002 (.000) |
+| `muonhistory` | .213 (.126) | .004 (.003) | .010 (.003) | 6.388 (1.184) | .030 (.025) |
+
+Per-head Muon ties Muon on every score here. `muonhistory` ties Muon on relearning (+.021) and is reversed on memory (-6.132).
+
+### Why size growth matters
+
+Query-key normalization makes each head's block of rows scale-invariant, so the gradient has no part along it. Muon's orthogonalized step does have one, so the matrix grows. From a starting size of 8, 600 steps gave 32 for Muon, 163 for per-head Muon at lr .08, 10 for the tangent rule and 8 for the sphere rule. A larger matrix turns by a smaller angle per step. Our reading, not tested on its own, is that this growth acts as a brake: stopping it gives fast relearning and heavy forgetting.
+
+### What did not run for attention
+
+Width 96 did not run, and time per step was not judged, because no rule passed the scores first. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
+
+### Commands for attention
+
+```bash
+python3 check.py                                               # includes the new rules
+python3 attncontrols.py                                        # frozen and random controls
+ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11,12,13 --tier a
+ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11 --tier ax4 --rules muon,muonsplit,muonsphere,muonhistory
+python3 chart_attention.py                                     # draws attention.png
+```
+
+### Literature for attention
+
+Per-head Muon is published and is a baseline here: Kimi K3 (arXiv:2607.24653, read secondhand), GLM-5's Muon Split, Group Muon (https://arxiv.org/abs/2605.08933), DeepSpeed's `per_head_muon` (https://www.deepspeed.ai/docs/config-json/), Megatron (https://github.com/NVIDIA/Megatron-LM/pull/6326), Moonlight (https://github.com/MoonshotAI/Moonlight/issues/42) and Motif 3 (https://arxiv.org/pdf/2608.09119).
+
+Removing the part of a step that only changes size is also published: AdamP (https://arxiv.org/abs/2006.08217) and Rotational Equilibrium (https://arxiv.org/pdf/2305.17212). The running sum of gradient products comes from AdaGrad and Shampoo (arXiv:1802.09568). We found no source that applies size removal to query-key normalization or Muon, or that uses the input-side sum on a per-head sphere. These searches don't settle that, so treat the new rules as new combinations of known parts.
+
 ## Literature
 
 | Paper | What it does | Relation here |

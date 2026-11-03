@@ -4,6 +4,8 @@
 > We are using this environment to write a paper for ICML 2027. It was built in [AI Research School](https://www.skool.com/become-ai-researcher-2669), and you can use the code, results and ideas in your own research. The code is MIT licensed, and neither permission nor co-authorship is needed.
 >
 > **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
+>
+> **On attention alone, we wrote four new update rules. None beat both Muon and per-head Muon by the rule we wrote first.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
@@ -104,6 +106,28 @@ RowNorm on the embedding and head lost to Adam by .0239 at 250 steps and tied it
 
 Keeping attention and MLP matrices on the Stiefel manifold lost to Muon's unconstrained recipe by .0338 at 250 steps. 2606.13276 reports its result at 50,000 steps on GPT-2 small, 200 times longer, and we did not run this rule at 1,000 steps.
 
+### Do not expect a new attention rule to beat per-head Muon yet
+
+Attention decides where a token looks. Each token makes a **query**, each earlier token makes a **key**, and matching pairs get read. We built a separate test for only the query and key matrices, with six tasks: copy a token, select the token after a cue, read the latest token, count the most common token, remember old cues after learning new ones, and relearn when the same cues change meaning.
+
+**Query-key normalization** rescales queries and keys, so the size of those matrices does not change the output. Muon's step still makes them larger, and a larger matrix turns less per step. That gave us the idea for the new rules: remove the part of the step that only changes size, per attention head.
+
+**`muonhistory`** does that and also divides the step by a running sum of past gradient directions. It was the fastest to relearn, and it forgot more:
+
+| Rule, 600 steps, 5 worlds | Copy | Remember old cues | Relearn |
+|---|---|---|---|
+| Muon | 2.007 | .493 | 2.153 |
+| **Per-head Muon** | **1.546** | **.231** | 1.980 |
+| Muon with gradient history (`muonhistory`) | 1.952 | 1.421 | **.677** |
+
+Lower is better. These are mean losses over 5 worlds no run had read, with one training run per setting in each world. Per-head Muon is already published. It beat Muon on copy and on reading the latest token, and tied the other scores.
+
+![Forgetting against relearning for each attention rule](attention.png)
+
+> **At 2,400 steps every rule solves the tasks, `muonhistory`'s relearning gain over Muon is a tie (.030 vs .051), and its forgetting is much worse (6.388 vs .256).**
+
+The size growth seems to act as a brake on learning. Removing it relearns faster and overwrites old cues. We don't know yet whether a rule can keep both. Per-head Muon's sources and the numbers for all nine rules are in [RESULTS.md](RESULTS.md).
+
 ---
 
 ## Where it stops working
@@ -143,4 +167,4 @@ python3 env.py --spec muon --tier 5s --world 7
 
 - [RESULTS.md](RESULTS.md): per-world tables, controls, commands and literature.
 - [EXPERIMENTS.md](EXPERIMENTS.md): the working log, with each prediction written before its run.
-- [chart.py](chart.py) draws the chart. MIT licence; the downloaded data has its own licences.
+- [chart.py](chart.py) and [chart_attention.py](chart_attention.py) draw the charts. MIT licence; the downloaded data has its own licences.
