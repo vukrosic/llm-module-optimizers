@@ -220,3 +220,9 @@ On tune rows, Muon was better: Lion added +.0034 and Adam added +.0031. The pred
 The q,k rule faded, so the larger gap has to be checked at the same length. Muon on every matrix is tuned at 1,000 steps with the same protocol as the other recipes.
 
 Prediction, written before any run: on worlds 15 to 19 at 1,000 steps, the Muon recipe (Adam on embedding and head) beats Muon on every matrix by +.010 to +.040. If it is under the .005 floor, one rule is enough for matrices at this length.
+
+### Round 8 results
+
+Muon recipe vs Muon on every matrix, 1,000 steps, worlds 15 to 19: +.0074, error .0017, holds; per world +.0092 +.0110 +.0036 +.0033 +.0101. Tune gap .0054.
+
+The prediction failed low: +.0074 is under the predicted +.010, while it still clears the .005 floor. Adam on embedding and head keeps a smaller gain at 1,000 steps. At 250 steps the same gap is about +.024, by subtracting two comparisons and not from a direct run.
