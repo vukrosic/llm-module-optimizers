@@ -91,3 +91,9 @@ Prediction before running, for Muon with about 200 extra lr-only settings (`lron
 Result: lr-only (155 settings) against Muon: +.0033, error .0019, a tie. Rule search against lr-only: +.0040, error .0012, positive in all 5 worlds (+.0080 +.0047 +.0024 +.0041 +.0007), under the .005 floor. Both match the prediction. At 250 steps Lion on q and k gives a small real gain that doesn't reach the floor. Next: does it grow at 1,000 steps and at 1m?
 
 2605.09176 section 12.5 (read November 3, 2026) frames per-group rules as an open direction with no citations and reports no study that compares or searches assignments. Its five open questions include which groups need coordinate-wise adaptivity and whether embeddings and heads need separate optimizers. Our tables answer those questions under one protocol at the sizes tested, whatever K1 says.
+
+## Round 2: 1,000 steps (5sx4), prediction before the rule search
+
+Tuned on tune rows so far: sym 4.145, muon 4.1488, sym-rownorm 4.1519, sym-hybrid-all 4.1577, standard 4.1636, rownorm-all 4.1685, lion-all 4.1844, normsgd-all 4.1979. The search starts from `sym`, the best recipe.
+
+Prediction: on fresh worlds the rule search beats lr-only by +.002 to +.008, and Lion on q and k does not survive at 1,000 steps (the search picks another rule there), because lion-all fell from 4th of 8 at 250 steps to 7th of 8 here. Drop the Lion idea if the search keeps it and the gap to lr-only stays under .002.
