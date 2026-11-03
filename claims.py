@@ -32,7 +32,7 @@ def chosen(tier, moe=0):
 def find(all_rows, spec, tier, world=0, jitter=0, moe=0):
     want = arms.show(arms.parse(spec))
     for r in reversed(all_rows):
-        if r["spec"] == want and r["tier"] == tier and r["world"] == world and r["jitter"] == jitter and r["moe"] == moe and not r["leak"] and not r["double"] and r["qknorm"] and not r["tied"]: return r
+        if r["spec"] == want and r["tier"] == tier and r["world"] == world and r["jitter"] == jitter and r["lr_mult"] == 1 and r["moe"] == moe and not r["leak"] and not r["double"] and r["qknorm"] and not r["tied"]: return r
 
 
 def items(r, score):
@@ -43,7 +43,7 @@ def noise(all_rows, tier, score):
     """The standard deviation across jitter runs of the tuned Muon recipe; the wider of the plain spread and the largest gap to its mean over 2."""
     c = chosen(tier).get("muon")
     if not c: return None
-    want = arms.show(arms.parse(c["spec"])); v = [r["scores"][score] for r in all_rows if r["spec"] == want and r["tier"] == tier and r["world"] == 0 and r["moe"] == 0 and r["lr_mult"] == 1 and r["scores"].get(score) is not None and not r["leak"] and r["qknorm"] and not r["tied"]]
+    want = arms.show(arms.parse(c["spec"])); v = [r["scores"][score] for r in all_rows if r["spec"] == want and r["tier"] == tier and r["world"] == 0 and r["moe"] == 0 and r["lr_mult"] == 1 and r["scores"].get(score) is not None and not r["leak"] and not r["double"] and r["qknorm"] and not r["tied"]]
     return (float(np.std(v, ddof=1)), len(v)) if len(v) > 2 else None
 
 
