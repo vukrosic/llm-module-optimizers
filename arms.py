@@ -55,6 +55,7 @@ def base(emb="adam", head="adam", att="muon", mlp="muon", router="rownorm", **lr
 ARMS = {
     "all-adam": lambda: base(att="adam", mlp="adam", router="adam"),
     "muon": lambda: base(router="adam"),
+    "muon-all": lambda: base(emb="muon", head="muon", router="adam"),  # Muon on every matrix; norm scales are vectors, which Muon can't orthogonalize, so they stay on Adam
     "sym": lambda: base(emb="rownorm", head="rownorm", mlp="hybrid", router="routernorm"),
     "sym-rownorm": lambda: base(emb="rownorm", head="rownorm", router="routernorm"),
     "sym-hybrid-all": lambda: base(emb="hybrid", head="hybrid", mlp="hybrid", router="routernorm"),

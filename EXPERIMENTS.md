@@ -108,3 +108,17 @@ Width 64, 4 layers, hidden matrices hold 51%, 1,000 steps. Tune `--from-tier 5sx
 ## Stopped, November 3, 2026
 
 The 1m tuning was stopped before any result, because the fast experiments had already answered the question at these sizes and 1m was too slow alongside other jobs. So the kill test's second tier, `beat.py`, the hidden read and `speed.py` on designs did not run. RESULTS.md lists what did not run. The prediction for 1m stays unscored.
+
+
+## Round 4: mixing rules at 5s, prediction before running
+
+Vuk asked for a direct test: mix the rules module by module in fast runs, and either find rules for choosing them or show that one optimizer is enough. `mix.py` starts from the lr-only design (the hardest control so far), swaps one module to each rule, then runs random mixes, and checks the best mix on fresh worlds 15 to 19 against that base, Muon's recipe, Muon on every matrix (`muon-all`), the standard baseline and `sym`.
+
+Predictions:
+
+1. Muon on every matrix loses to Muon's recipe by more than .005 on fresh worlds, because swapping the embedding to Muon cost about .04 in the rule search's rows.
+2. The embedding and head care most about their rule. Among hidden modules the best 4 rules sit within .01 of each other.
+3. A mix scores about what its swaps add up to: correlation above .8 across 60 random mixes. If so, rules can be chosen one module at a time.
+4. The best mix beats the lr-only design on fresh worlds by under .01, and it may tie.
+
+Stop rule: if the best mix does not clear max(.005, 2 errors) against the lr-only design, the result at 5s is that no rule mix beats tuned lrs on Muon's recipe. One design goes to fresh worlds, so nothing is picked among them. Worlds 20 to 23 stay unread.
