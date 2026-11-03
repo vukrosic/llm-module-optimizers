@@ -3,13 +3,14 @@
 > [!IMPORTANT]
 > We are using this environment to write a paper for ICML 2027. It was built in [AI Research School](https://www.skool.com/become-ai-researcher-2669), and you can use the code, results and ideas in your own research. The code is MIT licensed, and neither permission nor co-authorship is needed.
 >
-> **On a small LLM, searching for a different update rule per module added less than our .005 noise floor once every optimizer had its own tuned learning rate per module. Muon's recipe beat the standard baseline at both lengths we tested.**
+> **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
+| **Muon's recipe vs Muon on every matrix** | **+.0239** (error .0020) | **+.0074** (error .0017) |
 | **Muon's recipe vs the standard baseline** | **+.0162** (error .0015) | **+.0107** (error .0022) |
+| Lion vs Muon on query and key | +.0083 (error .0012) | +.0001 (error .0018) |
 | Rule search vs the best published recipe | +.0073 (error .0031) | +.0003 (error .0008) |
-| Rule search vs a search over learning rates only | +.0040 (error .0012) | not run |
 
 ![Gap per world for each comparison](gaps.png)
 
@@ -31,7 +32,7 @@ So recent papers give each kind of weight, each **module**, its own rule. **Muon
 
 Each module can also have its own **learning rate (lr)**, the size of the move. A new rule can look better only because it got a better lr.
 
-Our question: once every optimizer has one tuned lr per module, does searching for the best rule per module still help?
+Our question: once every optimizer has one tuned lr per module, does each module need its own rule, or is one rule enough?
 
 ---
 
@@ -39,15 +40,53 @@ Our question: once every optimizer has one tuned lr per module, does searching f
 
 **Loss** is cross-entropy on web text the model never trained on, and lower is better. A **world** is a separate stretch of text with its own held-out rows. We count a gap as real only if its mean over worlds exceeds .005 and 2 errors. Every comparison uses one training run per setting per world.
 
-### Try Muon's recipe before searching for rules
+### Use Adam on the embedding and head, and Muon on hidden matrices
 
 Muon's recipe uses Muon on hidden matrices and Adam on the embedding, head and norm scales. The standard baseline uses Adam everywhere. Muon's recipe won in all 5 worlds at both lengths, by .0162 at 250 steps and .0107 at 1,000 steps.
 
-> **Muon's recipe had the lowest loss of the published recipes at 250 steps, and its lead fell with length, to +.0027 in its weakest world at 1,000 steps.**
+We then swapped one module's rule at a time at 250 steps and measured the change in tune loss, with the lr of the new rule tuned on 3 to 5 values. Each module has a clear preference, except query and key.
+
+| Module | Lowest loss | Next rule adds | Muon adds |
+|---|---|---|---|
+| Embedding | Adam | RowNorm +.018 | +.043 |
+| Head | Adam | Muon +.0097 | +.0097 |
+| Query and key | Lion | Adam +.0005 | +.0036 |
+| Value and output | Muon | Hybrid +.0036 | best |
+| MLP gate and up | Muon | Lion +.0029 | best |
+| MLP down | Muon | Hybrid +.0027 | best |
+| Norm scales | Adam | NormSGD on vectors +.0102 | can't run on vectors |
+
+> **Apart from query and key, each module kept the rule Muon's recipe already gives it. These swaps start from that recipe with lrs tuned on 155 settings, which favours it.**
+
+### Do not use one rule on every matrix
+
+Muon on every matrix lost to Muon's recipe by .0239 at 250 steps and .0074 at 1,000 steps. The only change between them is Adam on the embedding and head. At 250 steps, Muon's recipe with tuned lrs and Lion on query and key beat Muon on every matrix by .0345, and Lion, RowNorm and NormSGD on every matrix by .0536, .0609 and .1061. Norm scales stayed on Adam in all of these arms, because these rules need matrices.
+
+> **The gap shrinks with length, so this answer may change on longer runs.**
+
+### Move query and key away from Muon only in very short runs
+
+At 250 steps, four other rules on query and key each beat Muon, by .0056 to .0083, and they tie with each other. So the rule here is that query and key do not want Muon, and not that they want Lion. The gain also held on worlds 21 to 23, which no earlier run read: +.0090, error .0013.
+
+At 1,000 steps Lion and Adam tie Muon there, at +.0001 and +.0010, and Muon has the lower tune loss.
+
+Query and key also go through QK-norm. Without it, Lion's gain at 250 steps fell to +.0039, error .0015, but we did not test that drop with its own error, so QK-norm is not shown to be the cause.
+
+> **Muon's recipe needs no third rule at 1,000 steps. We have not run the 250-step gain on a larger model.**
+
+### One knob from Muon to a normalized gradient did not replace the two rules
+
+We wrote one new rule, `softmuon`. It raises the singular values of the update to a power p, so p 0 is orthogonalization and p 1 is a normalized gradient. Query and key preferred p .75, while value and output preferred p near 0, where p .75 added .0305.
+
+The best single p on all hidden matrices was .1. It lost to the design with Lion on query and key by .0114 on worlds 15 to 19 and by .0104 on worlds 21 to 23.
+
+> **Hidden matrices disagree at 250 steps, so one p did not cover them.**
 
 ### Compare a new rule against lr tuning, or you may credit the rule for the lr
 
 The rule search spent 218 settings at 250 steps and beat Muon's recipe by .0073. It put Lion on attention's query and key matrices and kept Muon or Adam elsewhere. A search over lrs alone spent 155 settings and tied Muon's recipe at +.0033. The search's remaining edge is .0040, positive in all 5 worlds and under our floor.
+
+A later retest changed only query and key, from the lr-only design. It cleared the floor at +.0067, error .0011, on those same worlds, so the search's own design carried extra changes that gave nothing back.
 
 > **At 250 steps about half of the rule search's gain came from lrs that needed no new rule.**
 
@@ -70,7 +109,7 @@ Keeping attention and MLP matrices on the Stiefel manifold lost to Muon's uncons
 ## Where it stops working
 
 - **Size.** The largest finished model has 2 layers and width 48, and hidden matrices hold only 37% of its weights. At 250 steps, training them is worth .103, 21 times the floor, so the test can see them matter. Our guess is that short runs favour rules with fast early progress.
-- **Unfinished checks.** Hidden rows were never read, speed was not measured for designs, and the audit of other scores did not run. All verdicts use web-text loss only.
+- **Unfinished checks.** Hidden rows were never read, speed was not measured for designs, and the audit of other scores did not run. All verdicts use web-text loss only. `softmuon` uses an exact SVD, so it costs more per step than Muon.
 - **Manifold rules** were tuned as baselines at 250 steps and were not in the search's menu.
 - **Few worlds.** Five worlds detect gaps near .005 only when the spread between worlds is small.
 

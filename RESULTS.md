@@ -82,6 +82,53 @@ lr-only, 250 steps       emb=adam:.3 head=adam:.048 norm=adam:.019 qk=muon:.017 
 rule search, 1,000 steps emb=rownorm:.75 head=rownorm:.062 norm=adam:.015 qk=muon:.032 vo=muon:.041 gu=hybrid:.008 down=hybrid:.02
 ```
 
+## Which rule does each module want? Worlds 15 to 23
+
+Round 4 to round 8 of [EXPERIMENTS.md](EXPERIMENTS.md), with predictions. Settings come from tune rows of world 0. Mix means the lr-only design with Lion on query and key.
+
+### One swap at a time, 250 steps, added tune loss against lr-only (4.3974)
+
+| Module | Adam | Muon | RowNorm | Hybrid | Lion | NormSGD |
+|---|---|---|---|---|---|---|
+| emb | 0 | +.043 | +.018 | +.029 | +.022 | |
+| head | 0 | +.0097 | | +.0172 | | +.0126 |
+| qk | -.0031 | 0 | -.0028 | | -.0036 | -.0024 |
+| vo | +.0346 | 0 | | +.0036 | +.0301 | +.0344 |
+| gu | +.0043 | 0 | | +.0035 | +.0029 | |
+| down | | 0 | | +.0027 | +.0040 | |
+
+Norm scales: Adam 0, norm1d +.0102, heavy ball +.0122, Lion +.0198. Blank cells were outside the 4 closest rules for that module. Across 60 random mixes the sum of swaps predicted the mix's loss with correlation .881, and mixes did better than the sum by .0137 on average.
+
+### Fresh worlds
+
+| Comparison | Length | Worlds | Mean gap | Error | Verdict | Per world |
+|---|---|---|---|---|---|---|
+| Muon's recipe vs Muon on every matrix | 250 | 15-19 | +.0239 | .0020 | holds | +.0186 +.0230 +.0253 +.0225 +.0300 |
+| Muon's recipe vs Muon on every matrix | 1,000 | 15-19 | +.0074 | .0017 | holds | +.0092 +.0110 +.0036 +.0033 +.0101 |
+| Mix vs lr-only | 250 | 15-19 | +.0083 | .0012 | holds | +.0101 +.0088 +.0068 +.0069 +.0086 |
+| Mix vs lr-only | 250 | 10-14 | +.0067 | .0011 | holds | +.0082 +.0052 +.0089 +.0045 +.0066 |
+| Mix vs lr-only | 250 | 21-23 | +.0090 | .0013 | holds | +.0115 +.0083 +.0071 |
+| Mix vs Muon's recipe | 250 | 15-19 | +.0106 | .0016 | holds | +.0118 +.0122 +.0110 +.0137 +.0043 |
+| Mix vs Muon on every matrix | 250 | 15-19 | +.0345 | .0021 | holds | +.0304 +.0352 +.0364 +.0362 +.0342 |
+| Mix vs Lion on every matrix | 250 | 15-19 | +.0536 | .0023 | holds | +.0570 +.0593 +.0537 +.0522 +.0459 |
+| Mix vs RowNorm on every matrix | 250 | 15-19 | +.0609 | .0025 | holds | +.0619 +.0676 +.0639 +.0579 +.0531 |
+| Mix vs NormSGD on every matrix | 250 | 15-19 | +.1061 | .0031 | holds | +.1120 +.1109 +.0946 +.1063 +.1066 |
+| Mix vs the standard baseline | 250 | 15-19 | +.0271 | .0021 | holds | +.0295 +.0318 +.0229 +.0303 +.0213 |
+| Adam vs Muon on q,k | 250 | 15-19 | +.0077 | .0013 | holds | +.0079 +.0068 +.0057 +.0068 +.0111 |
+| RowNorm vs Muon on q,k | 250 | 15-19 | +.0063 | .0013 | holds | +.0073 +.0085 +.0049 +.0024 +.0086 |
+| NormSGD vs Muon on q,k | 250 | 15-19 | +.0056 | .0012 | holds | +.0063 +.0054 +.0018 +.0051 +.0094 |
+| Lion vs Adam on q,k | 250 | 15-19 | +.0006 | .0012 | tie | +.0022 +.0020 +.0011 +.0001 -.0025 |
+| Lion vs Muon on q,k, no QK-norm | 250 | 15-19 | +.0039 | .0015 | tie | +.0087 +.0038 +.0045 -.0010 +.0033 |
+| Lion vs Muon on q,k | 1,000 | 15-19 | +.0001 | .0018 | tie | -.0038 -.0041 +.0012 +.0025 +.0048 |
+| Adam vs Muon on q,k | 1,000 | 15-19 | +.0010 | .0018 | tie | -.0047 -.0007 +.0014 +.0037 +.0053 |
+| Mix vs p .1 on all hidden | 250 | 15-19 | +.0114 | .0019 | holds | +.0142 +.0130 +.0098 +.0153 +.0047 |
+| Mix vs p .1 on all hidden | 250 | 21-23 | +.0104 | .0013 | holds | +.0101 +.0099 +.0114 |
+| p .75 on q,k vs lr-only | 250 | 15-19 | +.0056 | .0011 | holds | +.0067 +.0046 +.0036 +.0047 +.0084 |
+
+Added tune loss for `softmuon`, each at its best of 5 lrs: q,k +.0001, +.0008, -.0019, -.0029 at p .1, .25, .5, .75; value and output +.0081, +.0131, +.0253, +.0305; gate and up +.0018, +.0022, +.0031, +.0060; down +.0005, +.0016, +.0024, +.0032. With p 0 on q,k, the exact SVD added +.0026 against Muon's 5 Newton-Schulz steps.
+
+The 1,000-step q,k comparisons start from Muon's recipe tuned at that length, because no lr-only design exists there. Designs tried in these rounds: 1 mix, 4 q,k rules and 1 single-p design. The verdict rule does not correct for that count.
+
 ## Controls: can the test tell?
 
 | Control at 250 steps | Mean gap | Error | Reading |
@@ -123,6 +170,17 @@ python3 chart.py                                         # draws gaps.png
 ```
 
 `results.jsonl` holds every row, `choices.jsonl` every setting chosen, and `runs/` the per-item scores that paired errors come from. Results made before the test's last fixes are in `old/` and are not comparable.
+
+## Commands for the module rounds
+
+```bash
+python3 mix.py --tier 5s
+python3 qkrule.py --tier 5s
+python3 softrule.py --tier 5s
+python3 qklong.py --tier 5sx4
+python3 search.py tune muon-all --tier 5sx4 --from-tier 5s
+python3 embhead.py --tier 5sx4
+```
 
 ## Literature
 

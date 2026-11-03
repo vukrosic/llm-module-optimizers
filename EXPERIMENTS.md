@@ -112,7 +112,7 @@ The 1m tuning was stopped before any result, because the fast experiments had al
 
 ## Round 4: mixing rules at 5s, prediction before running
 
-Vuk asked for a direct test: mix the rules module by module in fast runs, and either find rules for choosing them or show that one optimizer is enough. `mix.py` starts from the lr-only design (the hardest control so far), swaps one module to each rule, then runs random mixes, and checks the best mix on fresh worlds 15 to 19 against that base, Muon's recipe, Muon on every matrix (`muon-all`), the standard baseline and `sym`.
+The next question was a direct test: mix the rules module by module in fast runs, and either find rules for choosing them or show that one optimizer is enough. `mix.py` starts from the lr-only design (the hardest control so far), swaps one module to each rule, then runs random mixes, and checks the best mix on fresh worlds 15 to 19 against that base, Muon's recipe, Muon on every matrix (`muon-all`), the standard baseline and `sym`.
 
 Predictions:
 
@@ -225,4 +225,4 @@ Prediction, written before any run: on worlds 15 to 19 at 1,000 steps, the Muon 
 
 Muon recipe vs Muon on every matrix, 1,000 steps, worlds 15 to 19: +.0074, error .0017, holds; per world +.0092 +.0110 +.0036 +.0033 +.0101. Tune gap .0054.
 
-The prediction failed low: +.0074 is under the predicted +.010, while it still clears the .005 floor. Adam on embedding and head keeps a smaller gain at 1,000 steps. At 250 steps the same gap is about +.024, by subtracting two comparisons and not from a direct run.
+The prediction failed low: +.0074 is under the predicted +.010, while it still clears the .005 floor. Adam on embedding and head keeps a smaller gain at 1,000 steps. At 250 steps the same gap is +.0239, error .0020, on the same worlds, read directly from saved rows after this round.
