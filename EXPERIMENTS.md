@@ -305,3 +305,23 @@ Predictions, worlds 4 to 8, tuned on world 0 with the same grid:
 4. It does not win overall, because retain.old.nll stays above Muon's .381. About 60% for this one.
 
 Drop the idea if prediction 1 fails.
+
+### Round 10 results at 600 steps, worlds 4 to 8
+
+`muonhistory` at its pick, lr .02: copy.area 1.663 (.262), select.area .730 (.011), latest.area .796 (.042), retain.old.nll 4.658 (.266), switch.new.area .620 (.145), majority.area .951 (.025).
+
+Against Muon: copy +.516 holds, select tie, latest +.147 tie, retain -4.276 reversed, switch +1.811 holds, majority -.040 reversed. Against per-head Muon: only switch wins (+1.487), and retain is reversed by 4.068. No win.
+
+Predictions: 1 failed (4.658 is above half of 5.970, the drop condition), 2 held (.620), 3 held in size and not in the verdict (+.147, error .090), 4 held. The brake per direction does not stop forgetting at this lr, so I'm dropping it as a fix for forgetting.
+
+## Round 11: is the forgetting only the lr pick?
+
+Tune rows for `muonhistory` at lr .01 had retain.old.nll .351 and switch .907, against 4.336 and .209 at lr .02. So the mean-rank pick may be buying plasticity with memory, and the comparison above may only show that. This round asks for memory first.
+
+Every rule, baselines included, picks again on world 0, from the wider grid, among lrs with retain.old.nll under 1. Verdicts use worlds 9 to 13, which no run has read. The win rule in `attnbeat.py` stays the same, with these picks.
+
+Predictions, written before any of these picks ran:
+1. No tangent or sphere rule wins overall, because the cap will force lrs where copy falls back to about 2.3.
+2. `muonhistory` beats Muon on switch.new.area by at least .3, and is not reversed on retain.old.nll. This is the case for a brake that helps, so it is the result I most want to see, and I put it at 40%.
+3. Lion beats Muon on switch.new.area by at least .3 with no reversal on any main score.
+4. If any rule wins at 600 steps, its gain on area scores shrinks by at least half at 2,400 steps.
