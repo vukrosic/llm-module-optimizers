@@ -375,3 +375,27 @@ Predictions, written before any of these ran:
 3. No momentum loses at least .3 on copy.area or switch.new.area.
 4. No orthogonalization loses at least .03 on select.area.
 5. Per-head orthogonalization at the same lr beats Muon on copy.area by at least .2.
+
+### Round 12 results
+
+Lr .02, worlds 4 to 8, lower is better, one training run per setting in each world.
+
+| Arm | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area | size at end |
+|---|---|---|---|---|---|---|---|
+| Muon | 2.179 | .735 | .943 | .381 | 2.431 | .911 | 27.1 |
+| No momentum | 2.316 | .741 | 1.070 | .793 | 1.251 | .897 | 9.3 |
+| No orthogonalization | 2.121 | .912 | .908 | .695 | 1.355 | .957 | 36.1 |
+| No growth | 1.697 | .734 | .785 | 4.487 | 1.216 | .927 | 8.0 |
+| Schedule for growth | 1.961 | .727 | .811 | 1.989 | 1.520 | .922 | 8.0 |
+| Per-head orthogonalization | 1.926 | .726 | .754 | .476 | 1.310 | .907 | 32.0 |
+
+Paired gaps against Muon, positive means the arm is better. No growth: copy +.482 holds, latest +.158 holds, switch +1.215 holds, retain -4.105 reversed. Schedule: latest +.131 holds, retain -1.607 reversed, switch +.912 tie. No momentum: switch +1.180 holds, retain -.412 tie. No orthogonalization: switch +1.076 holds, majority -.045 reversed, select -.177 tie. Per-head: latest +.189 holds, switch +1.122 holds, retain -.094 tie.
+
+Predictions:
+1. Held, far past the line: switch +1.215 and retain -4.105. Size growth is the memory.
+2. Failed. The schedule is 1.607 from Muon on retain and .912 on switch. Its tau came from one row of 15.6, and the mean end size is 27.1, so it may just be too weak.
+3. Failed. No momentum relearns better (+1.180), and copy's loss of .137 is under the line.
+4. Mean loss .177 passes the line, but the verdict is a tie because of spread across worlds.
+5. Mean gain .254 passes the line, but the verdict is a tie.
+
+New fact I did not predict: without momentum the size ends at 9.3 instead of 27.1. A gradient has no part along a head's rows, so the growth seems to come from momentum, which keeps pushing along old directions the rows have already moved in.
