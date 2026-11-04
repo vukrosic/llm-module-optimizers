@@ -291,6 +291,25 @@ Neither passes the win rule. At 2,400 steps, worlds 14 to 16, same lrs, `muongat
 
 Six rules were written for attention and two more only to explain. Muon's copy.area moved from 2.007 on worlds 9 to 13 to 1.568 on worlds 14 to 18, so five worlds are few for gaps of this size.
 
+### `muongate` on 15 more worlds
+
+Worlds 19 to 33, which no run had read, 600 steps, nothing retuned.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | 1.905 (.103) | .731 (.003) | .912 (.041) | .325 (.063) | 1.984 (.213) | .891 (.009) |
+| Per-head Muon | .08 | 1.833 (.121) | .727 (.003) | .746 (.029) | .224 (.072) | 2.055 (.196) | .884 (.009) |
+| Per-head Muon, not the pick | .02 | 1.838 | .721 | .806 | .225 | 2.001 | .885 |
+| `muongate` | .04 | 1.664 (.128) | .718 (.009) | .695 (.025) | .344 (.068) | 1.813 (.174) | .894 (.009) |
+
+| `muongate` against, positive means it is better, with worlds ahead of 15 | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| Muon | +.242 holds, 12 | +.013 tie, 10 | +.218 holds, 15 | -.019 tie, 8 | +.171 tie, 8 | -.003 tie, 5 |
+| Per-head .08 | +.169 tie, 13 | +.009 tie, 13 | +.051 tie, 11 | -.120 tie, 3 | +.242 tie, 9 | -.010 tie, 4 |
+| Per-head .02 | +.175 tie, 7 | +.003 tie, 11 | +.111 holds, 13 | -.119 tie, 4 | +.189 tie, 9 | -.009 tie, 4 |
+
+Only the two latest gains clear 3 errors. The five worlds of the last section overstated relearning (+.406, now +.171) and memory (+.263, now -.019), and had the sign of copy wrong (-.127, now +.242). The rule was picked because it looked best there, so its fall on relearning and memory was predicted. It does not pass the win rule.
+
 ### What did not run for attention
 
 Width 96 did not run, and time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
@@ -306,6 +325,7 @@ python3 attnparts.py --worlds 4,5,6,7,8                        # removes one par
 python3 attnsignal.py                                          # size, growth and task-change signals on world 0
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 14,15,16,17,18 --rules muon,muonsplit,muonfade,muongate
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attnlong.py --rules muonsplit,muongate --worlds 14,15,16
+ATTN_CHOICES=attn_choices_memory.jsonl python3 attnlong.py --rules muon,muonsplit,muongate --specs "qk=muonsplit:.02" --worlds 19,20,21,22,23,24,25,26,27,28,29,30,31,32,33 --tier a
 python3 attnvs.py "qk=muongate:.04" "qk=muonsplit:.02"         # one spec against another
 python3 chart_attention.py                                     # draws attention.png
 ```

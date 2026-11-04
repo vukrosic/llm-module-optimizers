@@ -475,3 +475,34 @@ Predictions, written before these ran:
 4. Muon reverses `muongate` on copy.area by at least .1. I put this at 50%.
 5. `muongate` passes the score part of the win rule, 3 of 5 scores against both baselines. I put this at 10%.
 If `muongate` holds on no score against Muon here, I drop it.
+
+### Round 14 results
+
+Worlds 19 to 33, 600 steps, nothing retuned. Errors over worlds in brackets.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | 1.905 (.103) | .731 (.003) | .912 (.041) | .325 (.063) | 1.984 (.213) | .891 (.009) |
+| Per-head Muon | .08 | 1.833 (.121) | .727 (.003) | .746 (.029) | .224 (.072) | 2.055 (.196) | .884 (.009) |
+| Per-head Muon, not the pick | .02 | 1.838 | .721 | .806 | .225 | 2.001 | .885 |
+| `muongate` | .04 | 1.664 (.128) | .718 (.009) | .695 (.025) | .344 (.068) | 1.813 (.174) | .894 (.009) |
+
+Paired gaps for `muongate`, positive means it is better, with the number of worlds of 15 where it was ahead:
+
+| Against | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| Muon | +.242 holds, 12 | +.013 tie, 10 | +.218 holds, 15 | -.019 tie, 8 | +.171 tie, 8 | -.003 tie, 5 |
+| Per-head .08 | +.169 tie, 13 | +.009 tie, 13 | +.051 tie, 11 | -.120 tie, 3 | +.242 tie, 9 | -.010 tie, 4 |
+| Per-head .02 | +.175 tie, 7 | +.003 tie, 11 | +.111 holds, 13 | -.119 tie, 4 | +.189 tie, 9 | -.009 tie, 4 |
+
+Only latest against Muon and latest against per-head .02 clear 3 errors. On a score outside the main five, learning the first cues (retain.learn.area), `muongate` beats Muon by +.337 and per-head .08 by +.158, both holding.
+
+Predictions:
+1. Held: latest +.218, ahead in all 15 worlds.
+2. Failed: switch +.171 is a tie, ahead in 8 of 15. The +.406 on worlds 14 to 18 was too large.
+3. Held: retain -.019 is a tie. The +.263 on worlds 14 to 18 was also too large.
+4. Failed the other way: `muongate` beats Muon on copy by +.242. Five worlds had the sign wrong.
+5. The 10% case did not happen: `muongate` clears no main score against both baselines.
+It holds on two scores against Muon, so I keep it.
+
+Result: `muongate` learns new things faster than Muon, on copy, latest and first cues, and keeps memory level with Muon. It does not relearn better than Muon on this evidence. It does not pass the win rule. Against per-head Muon it clears no main score and lags on memory in 12 of 15 worlds at the pick, though that verdict is a tie. These fit its design, which removes the brake during first learning and does nothing special at a task change. The 2,400-step check is still the 3 worlds of round 13, where it ties, with Muon's mean ahead on copy.

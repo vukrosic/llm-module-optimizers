@@ -5,7 +5,7 @@
 >
 > **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
 >
-> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, is reversed by neither on any score.**
+> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, learns new things faster than Muon and is reversed by neither on any score.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
@@ -134,13 +134,13 @@ We removed one part of Muon at a time. With size held fixed, forgetting went fro
 
 That growth also starts during first learning, when the model still has most to learn. **`muongate`** lets a head grow only after its gradient stops agreeing with its momentum.
 
-| Rule, 600 steps, 5 new worlds | Copy | Read latest | Remember old cues | Relearn |
+| Rule, 600 steps, 15 new worlds | Copy | Read latest | Remember old cues | Relearn |
 |---|---|---|---|---|
-| Muon | 1.568 | 1.004 | .651 | 1.808 |
-| Per-head Muon | 2.032 | .876 | .478 | 1.577 |
-| **`muongate`** | 1.695 | **.778** | **.388** | **1.402** |
+| Muon | 1.905 | .912 | .325 | 1.984 |
+| Per-head Muon | 1.833 | .746 | **.224** | 2.055 |
+| **`muongate`** | **1.664** | **.695** | .344 | **1.813** |
 
-> **Against Muon, only its gain on reading the latest token clears the noise, and that gain is gone by 2,400 steps. Treat `muongate` as the next rule to test, not as a result.**
+> **`muongate` learns new things faster than Muon: it read the latest token better in all 15 worlds (+.218), with memory level. It did not clear any main score against per-head Muon, so it does not pass the win rule, and at 2,400 steps it ties.**
 
 
 ---
