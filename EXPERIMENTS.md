@@ -506,3 +506,19 @@ Predictions:
 It holds on two scores against Muon, so I keep it.
 
 Result: `muongate` learns new things faster than Muon, on copy, latest and first cues, and keeps memory level with Muon. It does not relearn better than Muon on this evidence. It does not pass the win rule. Against per-head Muon it clears no main score and lags on memory in 12 of 15 worlds at the pick, though that verdict is a tie. These fit its design, which removes the brake during first learning and does nothing special at a task change. The 2,400-step check is still the 3 worlds of round 13, where it ties, with Muon's mean ahead on copy.
+
+## Round 15: `muongate` at 2,400 steps on more worlds and on a wider model
+
+The win rule's length and width checks have only used 3 worlds at 2,400 steps, and width 96 has never run. Nothing is retuned: lrs stay the picks from 600 steps (Muon .02, per-head Muon .08, `muongate` .04), and the gate threshold stays .2.
+
+Runs: 2,400 steps on worlds 17 to 21, adding to worlds 14 to 16; width 96 at 600 steps on worlds 14 to 21. One training run per setting.
+
+Predictions, written before running:
+1. At 2,400 steps `muongate` ties Muon on copy, select and latest, because all three reach near zero area late and the early lead shrinks. Gap under .1 on each.
+2. At 2,400 steps `muongate` beats Muon on switch by more than .1, since Muon's size growth keeps slowing it (.244 vs .003 on 3 worlds). I give this 60%.
+3. At 2,400 steps `muongate` beats Muon on retain by more than .1 (.669 vs .263 on 3 worlds). I give this 60%.
+4. At width 96 `muongate` keeps latest ahead of Muon by more than .1 and at least 2 errors, because width does not change what the gate measures. I give this 70%.
+5. At width 96 no won score reverses, meaning no gap of 2 errors against `muongate` on copy or latest.
+6. `muongate` still does not pass the win rule, because at 600 steps it clears no main score against per-head Muon. I give this 90%. If it passes at these sizes it still fails at 600, so the verdict stays no win.
+
+Drop the rule from the write-up as a lead if it reverses on latest at either size.
