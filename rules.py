@@ -81,13 +81,13 @@ def tangent(z, b):
 
 
 def muontangent(w, g, st, lr, k):
-    """Per-head Muon with the part along each head's rows removed. Query-key normalization makes a head's output ignore the size of its rows, so that part only grows the rows. The step keeps Muon's Frobenius size."""
+    """Per-head Muon with the part along each head's rows removed, which is MuonGS's projection (2610.37647) applied per head. Query-key normalization makes a head's output ignore the size of its rows, so that part only grows the rows. The step keeps Muon's Frobenius size."""
     d = nesterov(st, w, g, k.get("beta", .95))
     for b, e in zip(heads(w, k), heads(d, k)): z = tangent(newton_schulz(e), b); b.add_(z / (z.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr)
 
 
 def muonsphere(w, g, st, lr, k):
-    """muontangent that then puts each head's rows back at their first size. The rows' size never grows, so one lr turns every head by the same angle at every step of training."""
+    """muontangent that then puts each head's rows back at their first size, close to MuonH (2606.16899) per head. The rows' size never grows, so one lr turns every head by the same angle at every step of training."""
     d = nesterov(st, w, g, k.get("beta", .95)); st.setdefault("r", [float(b.norm()) for b in heads(w, k)])
     for b, e, r in zip(heads(w, k), heads(d, k), st["r"]): z = tangent(newton_schulz(e), b); b.add_(z / (z.norm() + 1e-7) * b.shape[0] ** 0.5, alpha=-lr); b.mul_(r / (b.norm() + 1e-12))
 

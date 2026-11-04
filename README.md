@@ -5,7 +5,7 @@
 >
 > **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
 >
-> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, learns new things faster than Muon at 600 steps. At 2,400 steps it ties Muon on everything except relearning, where it won in 3 of 6 worlds and was level in the rest.**
+> **On attention alone, we tested six more update rules. Most apply published ideas per attention head, such as [MuonGS](https://arxiv.org/abs/2610.37647)'s projection and [MuonH](https://arxiv.org/abs/2606.16899)'s fixed size. None beat both Muon and per-head Muon by the win rule we wrote first. The closest, `muongate`, learns new things faster than Muon at 600 steps. At 2,400 steps it ties Muon on everything except relearning, where it won in 3 of 6 worlds and was level in the rest.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
@@ -78,7 +78,7 @@ Query and key also go through QK-norm. Without it, Lion's gain at 250 steps fell
 
 ### One knob from Muon to a normalized gradient did not replace the two rules
 
-We wrote one new rule, `softmuon`. It raises the singular values of the update to a power p, so p 0 is orthogonalization and p 1 is a normalized gradient. Query and key preferred p .75, while value and output preferred p near 0, where p .75 added .0305.
+We wrote one more rule, `softmuon`, and did not search for earlier versions of it. It raises the singular values of the update to a power p, so p 0 is orthogonalization and p 1 is a normalized gradient. Query and key preferred p .75, while value and output preferred p near 0, where p .75 added .0305.
 
 The best single p on all hidden matrices was .1. It lost to the design with Lion on query and key by .0114 on worlds 15 to 19 and by .0104 on worlds 21 to 23.
 
@@ -110,7 +110,7 @@ Keeping attention and MLP matrices on the Stiefel manifold lost to Muon's uncons
 
 Attention decides where a token looks. Each token makes a **query**, each earlier token makes a **key**, and matching pairs get read. We built a separate test for only the query and key matrices, with six tasks: copy a token, select the token after a cue, read the latest token, count the most common token, remember old cues after learning new ones, and relearn when the same cues change meaning.
 
-**Query-key normalization** rescales queries and keys, so the size of those matrices does not change the output. Muon's step still makes them larger, and a larger matrix turns less per step. That gave us the idea for the new rules: remove the part of the step that only changes size, per attention head.
+**Query-key normalization** rescales queries and keys, so the size of those matrices does not change the output. Muon's step still makes them larger, and a larger matrix turns less per step. Published work already acts on this. [MuonGS](https://arxiv.org/abs/2610.37647) removes the part of the step that only changes size, per weight matrix, and [MuonH](https://arxiv.org/abs/2606.16899) holds each matrix at a fixed size. AdamP did the removal earlier for Adam. We tested these ideas per attention head.
 
 **`muonhistory`** does that and also divides the step by a running sum of past gradient directions. It was the fastest to relearn, and it forgot more:
 
@@ -131,6 +131,8 @@ Per-head Muon's sources and the numbers for all rules are in [RESULTS.md](RESULT
 ### Treat Muon's growth in query and key as a hidden learning rate schedule
 
 We removed one part of Muon at a time. With size held fixed, forgetting went from .381 to 4.487. With a falling learning rate added at that fixed size, the model matched Muon on every score, so the growth works as a schedule. Almost no growth happens without momentum: the size ended at 9.3 instead of 27.1.
+
+The schedule itself is published. [2608.24814](https://arxiv.org/abs/2608.24814) reports that lr and weight size act mainly through their ratio, and MuonGS says this ratio falls as the norm grows. MuonGS does not study forgetting or relearning, and we read only the abstract of 2608.24814.
 
 That growth also starts during first learning, when the model still has most to learn. **`muongate`** lets a head grow only after its gradient stops agreeing with its momentum.
 
@@ -168,6 +170,19 @@ Partly. Choosing rules per module by hand is published. We did not find a rule s
 | Modular Manifolds | Yes, by hand, on a small MLP | No | No, one norm budgets lrs |
 | 2607.20486 OPTScientist | No, one rule for all matrices | Yes | No |
 | **This repo** | **Yes** | **Yes** | **Yes** |
+
+The attention rules are mostly published ideas applied per head. The closest paper is MuonGS, which our first searches missed:
+
+| Rule here | Published idea | What differs here |
+|---|---|---|
+| `adamtangent` | [AdamP](https://arxiv.org/abs/2006.08217) | Per head, on query and key |
+| `muontangent` | MuonGS's projection | Per head, with the step rescaled to Muon's size |
+| `muonsphere` | MuonH's fixed size | Per head, and the step is projected first |
+| `muonfade` | MuonH's fixed size with a falling lr | Per head, and the step is projected first |
+| `muonhistory` | The fixed size above, with AdaGrad's and Shampoo's running sum | The combination, per head |
+| `muongate` | Effective lr and size growth, as above | Growth allowed only after gradient and momentum stop agreeing |
+
+We did not find these rules per head, or the growth gate in `muongate`, in three more searches, and those searches don't settle it. We also did not find forgetting or relearning compared across these rules.
 
 ---
 

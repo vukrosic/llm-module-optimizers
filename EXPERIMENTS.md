@@ -244,6 +244,8 @@ Rules:
 - `muontangent` is per-head Muon with the part along each head's rows removed.
 - `muonsphere` is `muontangent` that also puts each head's rows back at their first size, so the turning angle per step stays constant. My three searches found no source applying this to query-key normalization or to Muon. That does not prove nobody did.
 
+> Correction, November 4, 2026: those searches missed MuonGS (2610.37647), which applies the projection to Muon with QK-norm, per matrix, and MuonH (2606.16899), which holds each matrix at a fixed size. `muontangent` and `muonsphere` are these ideas per head. See "Literature for attention" in RESULTS.md.
+
 Predictions, all gaps positive for the first rule, floor .02, worlds 4 to 8:
 1. `muonsphere` beats Muon on switch.new.area by at least .05, because its rows don't grow and it can still turn late in training.
 2. `muonsphere` loses to Muon on retain.old.nll, because the same property lets it forget faster. If it wins both, this story is wrong.

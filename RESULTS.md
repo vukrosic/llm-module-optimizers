@@ -215,10 +215,10 @@ Lrs were picked on world 0, among lrs with retain.old.nll under 1, from a grid o
 | Adam | .048 | 1.378 (.239) | .767 (.025) | .950 (.027) | .265 (.096) | 1.679 (.506) | .926 (.016) |
 | Lion | .002 | 2.105 (.156) | .755 (.024) | .846 (.046) | .341 (.156) | 1.548 (.416) | .916 (.022) |
 | NormSGD | .04 | 1.561 (.304) | .874 (.066) | .981 (.023) | .595 (.263) | 1.191 (.468) | .954 (.013) |
-| Adam, tangent per head (new here) | .012 | 1.451 (.192) | .775 (.037) | .742 (.043) | 3.384 (.414) | 1.047 (.503) | .925 (.019) |
-| Muon, tangent per head (new here) | .005 | 2.218 (.094) | .751 (.014) | .945 (.062) | .261 (.076) | 1.335 (.418) | .894 (.017) |
-| Muon on a sphere per head (new here) | .005 | 2.215 (.097) | .750 (.014) | .945 (.064) | .161 (.044) | 1.596 (.293) | .894 (.017) |
-| `muonhistory` (new here) | .01 | 1.952 (.251) | .737 (.004) | .846 (.095) | 1.421 (.343) | .677 (.059) | .911 (.023) |
+| Adam, tangent per head (AdamP per head) | .012 | 1.451 (.192) | .775 (.037) | .742 (.043) | 3.384 (.414) | 1.047 (.503) | .925 (.019) |
+| Muon, tangent per head (MuonGS's projection per head) | .005 | 2.218 (.094) | .751 (.014) | .945 (.062) | .261 (.076) | 1.335 (.418) | .894 (.017) |
+| Muon on a sphere per head (close to MuonH per head) | .005 | 2.215 (.097) | .750 (.014) | .945 (.064) | .161 (.044) | 1.596 (.293) | .894 (.017) |
+| `muonhistory` (fixed size plus a running sum, per head) | .01 | 1.952 (.251) | .737 (.004) | .846 (.095) | 1.421 (.343) | .677 (.059) | .911 (.023) |
 
 Adam's pick sits on the top of its grid. Adam tangent's memory cap on world 0 did not carry over to fresh worlds.
 
@@ -230,7 +230,7 @@ Paired verdicts, positive means the first rule is better:
 | `muonhistory` vs Muon | switch +1.476 | retain -.927 | majority -.022 |
 | `muonhistory` vs per-head Muon | switch +1.303 | | copy -.407, retain -1.190 |
 
-No rule passes the win rule. With lrs picked by mean rank instead, on worlds 4 to 8, the new rules relearned and read the latest token better and forgot far more (retain.old.nll 4.658 to 5.970 against Muon's .381), and also did not pass. That table is round 9 and round 10 in [EXPERIMENTS.md](EXPERIMENTS.md).
+No rule passes the win rule. With lrs picked by mean rank instead, on worlds 4 to 8, these rules relearned and read the latest token better and forgot far more (retain.old.nll 4.658 to 5.970 against Muon's .381), and also did not pass. That table is round 9 and round 10 in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ### The same rules at 2,400 steps
 
@@ -279,7 +279,7 @@ Muon is not best on every score: on these rows every other arm relearns better t
 | `muonfade` | .02 | 1.441 (.239) | .728 (.013) | .801 (.059) | .312 (.097) | 2.456 (.314) | .902 (.007) |
 | `muongate` | .04 | 1.695 (.205) | .733 (.038) | .778 (.047) | .388 (.198) | 1.402 (.191) | .904 (.007) |
 
-| Comparison, positive means the new rule is better | copy | select | latest | retain | switch | majority |
+| Comparison, positive means the rule named first is better | copy | select | latest | retain | switch | majority |
 |---|---|---|---|---|---|---|
 | `muonfade` vs Muon | +.126 tie | +.009 tie | +.203 holds | +.339 holds | -.648 tie | +.003 tie |
 | `muonfade` vs per-head .08 | +.591 holds | +.092 tie | +.075 tie | +.167 tie | -.879 reversed | +.014 tie |
@@ -289,7 +289,7 @@ Muon is not best on every score: on these rows every other arm relearns better t
 
 Neither passes the win rule. At 2,400 steps, worlds 14 to 16, same lrs, `muongate` ties both baselines on every score (Muon .018/.005/.006/.669/.244; per-head .294/.002/.007/.405/1.120; `muongate` .218/.005/.008/.263/.003, in the order copy, select, latest, retain, switch). `muonfade` did not run at that length.
 
-Six rules were written for attention and two more only to explain. Muon's copy.area moved from 2.007 on worlds 9 to 13 to 1.568 on worlds 14 to 18, so five worlds are few for gaps of this size.
+Six rules were written for attention (`adamtangent`, `muontangent`, `muonsphere`, `muonhistory`, `muonfade`, `muongate`) and two more only to explain. Writing a rule here does not make it new; see "Literature for attention". Muon's copy.area moved from 2.007 on worlds 9 to 13 to 1.568 on worlds 14 to 18, so five worlds are few for gaps of this size.
 
 ### `muongate` on 15 more worlds
 
@@ -329,12 +329,12 @@ The switch gap against Muon comes from 3 worlds of 6 (+.729, +.949, +.597), wher
 
 ### What did not run for attention
 
-Width 96 did not run, because the machine was needed for other work. It ran only as a 10-step check that the code works. Time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
+Width 96 did not run, because the machine was needed for other work. It ran only as a 10-step check that the code works. Time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. These rules have no theory of when they should help, only the size argument above.
 
 ### Commands for attention
 
 ```bash
-python3 check.py                                               # includes the new rules
+python3 check.py                                               # includes these rules
 python3 attncontrols.py                                        # frozen and random controls
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11,12,13 --tier a
 ATTN_CHOICES=attn_choices_memory.jsonl python3 attntable.py --worlds 9,10,11 --tier ax4 --rules muon,muonsplit,muonsphere,muonhistory
@@ -351,7 +351,16 @@ python3 chart_attention.py                                     # draws attention
 
 Per-head Muon is published and is a baseline here: Kimi K3 (arXiv:2607.24653, read secondhand), GLM-5's Muon Split, Group Muon (https://arxiv.org/abs/2605.08933), DeepSpeed's `per_head_muon` (https://www.deepspeed.ai/docs/config-json/), Megatron (https://github.com/NVIDIA/Megatron-LM/pull/6326), Moonlight (https://github.com/MoonshotAI/Moonlight/issues/42) and Motif 3 (https://arxiv.org/pdf/2608.09119).
 
-Removing the part of a step that only changes size is also published: AdamP (https://arxiv.org/abs/2006.08217) and Rotational Equilibrium (https://arxiv.org/pdf/2305.17212). The running sum of gradient products comes from AdaGrad and Shampoo (arXiv:1802.09568). We found no source that applies size removal to query-key normalization or Muon, or that uses the input-side sum on a per-head sphere. These searches don't settle that, so treat the new rules as new combinations of known parts.
+Removing the part of a step that only changes size is also published: AdamP (https://arxiv.org/abs/2006.08217) and Rotational Equilibrium (https://arxiv.org/pdf/2305.17212). The running sum of gradient products comes from AdaGrad and Shampoo (arXiv:1802.09568). 
+
+**Correction, November 4, 2026.** This section used to say we found no source that applies size removal to query-key normalization or Muon. That was wrong. MuonGS (https://arxiv.org/abs/2610.37647) removes the part of Muon's step along the weights, per weight matrix, with QK-norm, and it was missed by the searches of round 9.
+
+- MuonGS steps along Õ = O − (⟨W,O⟩/‖W‖²)·W, where W is the weight matrix and O is Muon's orthogonalized update. It has no renormalization, and the norm grows only at second order. `muontangent` applies this projection per head and rescales the step to Muon's size.
+- MuonH (Hyperball, https://arxiv.org/abs/2606.16899) holds each matrix at its first size and normalizes the update. `muonsphere` and `muonfixed` do this per head, and `muonsphere` also projects the step first. `muonfade` adds a falling lr to `muonsphere`.
+- 2608.24814 (https://arxiv.org/abs/2608.24814) reports that lr and weight size act mainly through their ratio. That overlaps the hidden schedule measured here. MuonGS makes the same point about the effective lr η/‖W‖.
+- MuonGS reports results on dense models of 160M and 400M parameters on web text, with about 15% token-equivalent speedup over MuonH at matched loss. Our model has 2 layers and width 48, so the results here don't test its claim.
+
+What remains unfound after three more extended searches on November 4, 2026: a per-head version of MuonGS or MuonH, a growth gate like `muongate`, and a comparison of forgetting and relearning across these rules. Searches don't settle that. Treat the rules here as known parts applied per head, and `muongate`'s gate as the one part with no source so far.
 
 ## Literature
 
@@ -365,5 +374,10 @@ Removing the part of a step that only changes size is also published: AdamP (htt
 | 2607.20486 OPTScientist | Program search over one rule for all 2D matrices | No per-module search or test split |
 | 2605.04055, SGG (ACL 2025) | Modulate lrs per group, no choice of rule | The lr side of our question |
 | 1709.07417 | Searches one update equation on a ConvNet | Abstract only |
+| 2610.37647 MuonGS | Removes the part of Muon's step along the weights, per matrix, with QK-norm | `muontangent` applies it per head. Read except the last 2% of the page |
+| 2606.16899 Hyperball, MuonH | Holds each matrix at a fixed size and normalizes the update | `muonsphere`, `muonfixed` per head. Read as described in MuonGS and search results |
+| 2608.24814 | Lr and weight size act mainly through their ratio | The hidden schedule here. Abstract only |
+
+**Close and seen only in search results:** 2607.22444 (a critique of Hyperball), 2609.07017 (Hyperball and its base optimizer), 2605.10797 (Muown, row-norm control for Muon), 2604.01563 (normalization and optimizer coupling).
 
 **Not read in full:** 1709.07417, 2607.20548, 2605.26842, 2502.16982, 2603.20527, 2601.23000, 2506.01115, Celo (2501.12670), Celo2 (2602.19142). "We did not find" is the strongest statement these searches support.
