@@ -461,3 +461,17 @@ Predictions:
 5. Not tested as written, because neither won. `muongate`'s one clear gain over Muon, latest +.226, is -.001 at 2,400 steps, because every rule solves latest by then.
 
 Rules written for attention so far: 6, plus 2 used only to explain. With this many tries and world-to-world spread this large, Muon's copy moved from 2.007 on worlds 9 to 13 to 1.568 here, so these gaps need more worlds before anyone relies on them.
+
+## Round 14: is `muongate`'s gain real?
+
+Worlds 19 to 33, 15 worlds no run has read, 600 steps, same picks as round 13 with nothing retuned: Muon .02, per-head Muon .08, `muongate` .04. Per-head Muon at lr .02 runs beside them as a comparison outside the picks. The win rule is unchanged. Because 6 rules were tried over 5 scores, I also report which verdicts clear 3 errors, not only 2.
+
+`muongate` was chosen because it looked best on worlds 14 to 18, so its gains there are likely too large.
+
+Predictions, written before these ran:
+1. `muongate` beats Muon on latest.area by at least .1, and the verdict holds.
+2. `muongate` beats Muon on switch.new.area by at least .2, and the verdict holds. I put this at 40%.
+3. `muongate` is not reversed by Muon on retain.old.nll.
+4. Muon reverses `muongate` on copy.area by at least .1. I put this at 50%.
+5. `muongate` passes the score part of the win rule, 3 of 5 scores against both baselines. I put this at 10%.
+If `muongate` holds on no score against Muon here, I drop it.
