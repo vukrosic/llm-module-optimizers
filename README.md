@@ -5,7 +5,7 @@
 >
 > **On a small LLM, two rules were enough: Adam on the embedding, head and norm scales, and Muon on hidden matrices. One rule on every matrix lost at both lengths we tested. A third rule on attention's query and key matrices helped at 250 steps, and that gain was gone at 1,000 steps.**
 >
-> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, learns new things faster than Muon and is reversed by neither on any score.**
+> **On attention alone, we wrote six new update rules. None beat both Muon and per-head Muon by the rule we wrote first. The closest, `muongate`, learns new things faster than Muon at 600 steps. At 2,400 steps it ties Muon on everything except relearning, where it won in 3 of 6 worlds and was level in the rest.**
 
 | Paired gap in loss on held-out web text, over 5 worlds; positive means the first arm wins | 250 steps | 1,000 steps |
 |---|---|---|
@@ -140,7 +140,9 @@ That growth also starts during first learning, when the model still has most to 
 | Per-head Muon | 1.833 | .746 | **.224** | 2.055 |
 | **`muongate`** | **1.664** | **.695** | .344 | **1.813** |
 
-> **`muongate` learns new things faster than Muon: it read the latest token better in all 15 worlds (+.218), with memory level. It did not clear any main score against per-head Muon, so it does not pass the win rule, and at 2,400 steps it ties.**
+> **`muongate` learns new things faster than Muon: it read the latest token better in all 15 worlds (+.218), with memory level. It did not clear any main score against per-head Muon, so it does not pass the win rule.**
+
+At 2,400 steps on 6 worlds, `muongate` ties Muon on copy, selection, the latest token and memory. It still relearns better (+.379), because in 3 of the 6 worlds Muon had not finished relearning. The model with width 96 did not run.
 
 
 ---

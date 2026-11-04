@@ -522,3 +522,32 @@ Predictions, written before running:
 6. `muongate` still does not pass the win rule, because at 600 steps it clears no main score against per-head Muon. I give this 90%. If it passes at these sizes it still fails at 600, so the verdict stays no win.
 
 Drop the rule from the write-up as a lead if it reverses on latest at either size.
+
+### Round 15 results
+
+Only the 2,400-step part ran, on worlds 17, 18 and 19, added to worlds 14 to 16. I stopped world 20 and did not run width 96, because the Mac was needed for other work. Predictions 4 and 5 are untested.
+
+| Rule, 2,400 steps, worlds 14 to 19 | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | .154 (.087) | .004 (.002) | .008 (.002) | .429 (.198) | .381 (.175) | .240 (.005) |
+| Per-head Muon | .08 | .289 (.087) | .001 (.000) | .005 (.001) | .527 (.156) | .560 (.399) | .251 (.008) |
+| `muongate` | .04 | .183 (.080) | .007 (.003) | .009 (.003) | .431 (.243) | .002 (.001) | .248 (.005) |
+
+Paired gaps for `muongate`, positive means it is better:
+
+| Against | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| Muon | -.028 tie | -.003 tie | -.001 tie | -.002 tie | +.379 holds | -.008 tie |
+| Per-head .08 | +.107 tie | -.006 tie | -.004 tie | +.096 tie | +.558 tie | +.003 tie |
+
+The switch gap against Muon comes from 3 of the 6 worlds (+.729, +.949, +.597). In those worlds Muon had not finished relearning and `muongate` had. In the other 3 worlds the gap is under .005 either way.
+
+Predictions:
+1. Held: copy, select and latest tie Muon, all gaps under .1.
+2. Held: switch +.379, with 2.2 errors, from 3 worlds of 6.
+3. Failed: retain -.002 is a tie. The +.406 on worlds 14 to 16 did not last.
+4. Not run.
+5. Not run.
+6. Held: `muongate` does not pass the win rule. Its copy and latest wins over Muon at 600 steps are ties at 2,400, which are not reversals, but fewer than half hold.
+
+Result: at 2,400 steps `muongate` keeps one gain over Muon, relearning, and only in the worlds where Muon was still stuck. The search stops here with no rule passing.

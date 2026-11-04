@@ -310,9 +310,26 @@ Worlds 19 to 33, which no run had read, 600 steps, nothing retuned.
 
 Only the two latest gains clear 3 errors. The five worlds of the last section overstated relearning (+.406, now +.171) and memory (+.263, now -.019), and had the sign of copy wrong (-.127, now +.242). The rule was picked because it looked best there, so its fall on relearning and memory was predicted. It does not pass the win rule.
 
+### `muongate` at 2,400 steps on 6 worlds
+
+Worlds 14 to 19, nothing retuned. World 20 was stopped to free the machine.
+
+| Rule | lr | copy.area | select.area | latest.area | retain.old.nll | switch.new.area | majority.area |
+|---|---|---|---|---|---|---|---|
+| Muon | .02 | .154 (.087) | .004 (.002) | .008 (.002) | .429 (.198) | .381 (.175) | .240 (.005) |
+| Per-head Muon | .08 | .289 (.087) | .001 (.000) | .005 (.001) | .527 (.156) | .560 (.399) | .251 (.008) |
+| `muongate` | .04 | .183 (.080) | .007 (.003) | .009 (.003) | .431 (.243) | .002 (.001) | .248 (.005) |
+
+| `muongate` against, positive means it is better | copy | select | latest | retain | switch | majority |
+|---|---|---|---|---|---|---|
+| Muon | -.028 tie | -.003 tie | -.001 tie | -.002 tie | +.379 holds | -.008 tie |
+| Per-head .08 | +.107 tie | -.006 tie | -.004 tie | +.096 tie | +.558 tie | +.003 tie |
+
+The switch gap against Muon comes from 3 worlds of 6 (+.729, +.949, +.597), where Muon had not finished relearning. In the other 3 the gap is under .005. The copy and latest wins over Muon at 600 steps are ties here, so fewer than half of them hold, and `muongate` does not pass the win rule.
+
 ### What did not run for attention
 
-Width 96 did not run, and time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
+Width 96 did not run, because the machine was needed for other work. It ran only as a 10-step check that the code works. Time per step was not judged, because no rule passed the scores first. Timings from these runs came from a busy machine. Lrs were not retuned at 2,400 steps. Forgetting and relearning were not measured on real text, so these tasks say nothing yet about a large LLM. The new rules have no theory of when they should help, only the size argument above.
 
 ### Commands for attention
 
